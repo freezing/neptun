@@ -1,4 +1,3 @@
-### Meson ###
 # subproject directories
 /subprojects/*
 !/subprojects/*.wrap
@@ -31,3 +30,8 @@ compile_commands.json
 
 # Perf
 perf.*
+
+.idea/
+
+# CMake
+cmake-build-debug/

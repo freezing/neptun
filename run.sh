@@ -2,4 +2,4 @@
 
 BUILD_DIR="build-clang-debugoptimized"
 
-./"$BUILD_DIR"/demo
+./"$BUILD_DIR"/demo $@

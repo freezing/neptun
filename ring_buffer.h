@@ -1,5 +1,7 @@
 #pragma once
 
+#include <span>
+
 template<typename T>
 class RingBuffer {
 public:
@@ -9,14 +11,14 @@ public:
     m_end = m_buffer;
   }
 
-  std::size_t length() const {
+  size_t length() const {
     if (m_end >= m_begin) {
       return m_end - m_begin;
     }
     return m_begin - m_end;
   }
 
-  std::size_t remaining_capacity() const {
+  size_t remaining_capacity() const {
     return m_capacity - length();
   }
 
