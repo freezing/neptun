@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <queue>
 #include <vector>
 
 #include "network.h"
@@ -15,6 +16,22 @@
 namespace freezing::network::testing {
 
 namespace detail {
+
+constexpr int kReasonableMtu = 1400;
+
+using PacketPayload = std::vector<std::uint8_t>;
+
+struct UdpPackets {
+  std::queue<PacketPayload> packets;
+};
+
+struct SocketPredicate {
+  FileDescriptor socket_fd;
+
+  bool operator()(std::pair<IpAddress, FileDescriptor> candidate) const {
+    return socket_fd.value == candidate.second.value;
+  };
+};
 
 struct IpAddressOrSocketPredicate {
   FileDescriptor socket_fd;
@@ -28,17 +45,27 @@ struct IpAddressOrSocketPredicate {
 
 }
 
+// Currently treats all sockets as UDP sockets!
 class FakeNetwork {
 public:
-  void bind(FileDescriptor socket_fd, IpAddress ip_address) {
+  explicit FakeNetwork(int mtu = detail::kReasonableMtu) : m_mtu{mtu} {}
+
+  void bind(FileDescriptor fd, IpAddress ip_address) {
+    if (!is_socket_open(fd)) {
+      throw std::runtime_error("Cannot bind unknown socket: " + std::to_string(fd.value));
+    }
 
     auto it = std::find_if(
-        std::begin(m_bind), std::end(m_bind), detail::IpAddressOrSocketPredicate{socket_fd, ip_address});
+        std::begin(m_bind),
+        std::end(m_bind),
+        detail::IpAddressOrSocketPredicate{fd, ip_address});
 
     if (it != m_bind.end()) {
       throw std::runtime_error("IP " + ip_address.to_string() + " is already bind to a socket "
-                                   + std::to_string(socket_fd.value));
+                                   + std::to_string(fd.value));
     }
+
+    m_bind.emplace_back(ip_address, fd);
   }
 
   FileDescriptor udp_socket_ipv4() {
@@ -46,9 +73,72 @@ public:
     return FileDescriptor{fd};
   }
 
+  [[nodiscard]] std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
+                                                         std::span<std::uint8_t> buffer) {
+    auto ip = find_ip(fd);
+    if (!ip) {
+      throw std::runtime_error("Failed to read data from unbound socket: " + std::to_string(fd.value));
+    }
+    auto& udp_packets = m_buffers[*ip];
+    if (udp_packets.packets.empty()) {
+      return std::span<std::uint8_t>{};
+    }
+    auto packet = std::move(udp_packets.packets.front());
+    udp_packets.packets.pop();
+
+    // Any data in the packet that can't fit in the buffer is dropped.
+    int idx = 0;
+    for (auto it = buffer.begin(); it != buffer.end(); it++) {
+      if (idx >= packet.size()) {
+        // No more data to read.
+        break;
+      }
+      *it = packet[idx++];
+    }
+    return buffer.subspan(0, idx);
+  }
+
+  [[nodiscard]] std::size_t send_to(FileDescriptor fd,
+                                    IpAddress ip_address,
+                                    std::span<const std::uint8_t> payload) {
+    if (!is_socket_bound(fd)) {
+      throw std::runtime_error("Failed to send data via unbound socket: " + std::to_string(fd.value));
+    }
+    auto& buffer = m_buffers[ip_address];
+    buffer.packets.push(std::vector(payload.begin(), payload.end()));
+    // Limit packet payload to the size of MTU.
+    auto& packet_payload = buffer.packets.back();
+    if (packet_payload.size() > m_mtu) {
+      packet_payload.erase(packet_payload.begin() + m_mtu, packet_payload.end());
+    }
+    return payload.size();
+  }
+
 private:
+  int m_mtu;
   int m_next_fd{};
   std::vector<std::pair<IpAddress, FileDescriptor>> m_bind{};
+  std::map<IpAddress, detail::UdpPackets> m_buffers{};
+
+  [[nodiscard]] bool is_socket_open(FileDescriptor fd) const {
+    return fd.value < m_next_fd;
+  }
+
+  [[nodiscard]] bool is_socket_bound(FileDescriptor fd) const {
+    return find_ip(fd).has_value();
+  }
+
+  [[nodiscard]] std::optional<IpAddress> find_ip(FileDescriptor socket_fd) const {
+    auto it = std::find_if(
+        std::begin(m_bind),
+        std::end(m_bind),
+        detail::SocketPredicate{socket_fd});
+
+    if (it != m_bind.end()) {
+      return {it->first};
+    }
+    return {};
+  }
 };
 
 }

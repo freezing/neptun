@@ -6,37 +6,26 @@
 #include <thread>
 
 #include "ring_buffer.h"
-#include "udp.h"
+#include "udp_socket.h"
 
 using namespace std;
+using namespace freezing::network;
 
-int _ring_buffer_main() {
-  std::uint8_t data[] = {10, 20, 30, 40, 50, 60};
-  RingBuffer<std::uint8_t> buffer{64};
-  buffer.write(data);
-  std::string sep;
-  for (const std::uint8_t t : buffer) {
-    printf("%s%d", sep.c_str(), t);
-    sep = " ";
-  }
-  std::cout << std::endl;
-  return 0;
+std::span<const std::uint8_t> string_to_span(const std::string& s) {
+  return std::span(reinterpret_cast<const std::uint8_t*>(s.data()), s.size());
 }
 
 [[noreturn]] int udp_main_server(int port) {
   cout << "UDP Server" << endl;
-  std::vector<std::uint8_t> buffer;
-  buffer.resize(1024);
 
-  auto udp = UdpSocket::bind(port);
+  IpAddress ip = IpAddress::from_ipv4("0.0.0.0", port);
+
+  auto udp = UdpSocket<LinuxNetwork>::bind(ip, LINUX_NETWORK);
   while (true) {
-    cout << "Reading from UDP socket." << endl;
-    size_t num_bytes = udp.read(buffer.data(), buffer.size());
-    buffer[num_bytes] = 0;
-    std::string data((char * )buffer.data());
+    auto payload = udp.read();
+    std::string s((char * ) payload.data(), payload.size());
 
-    cout << "Read: " << num_bytes << " bytes. " << endl;
-    cout << data << endl;
+    cout << "Read: " << payload.size() << " bytes: " << s << endl;
     this_thread::sleep_for(chrono::seconds(1));
   }
 }
@@ -44,14 +33,14 @@ int _ring_buffer_main() {
 [[noreturn]] int udp_main_client(int port, int server_port, const std::string& data) {
   cout << "UDP Client" << endl;
 
-  struct sockaddr_in destination{};
-  destination.sin_port = htons(server_port);
-  inet_pton(AF_INET, "0.0.0.0", &(destination.sin_addr)); // IPv4
+  auto ip = IpAddress::from_ipv4("0.0.0.0", port);
+  auto server_ip = IpAddress::from_ipv4("0.0.0.0", server_port);
+  auto udp = UdpSocket<LinuxNetwork>::bind(ip, LINUX_NETWORK);
 
-  auto udp = UdpSocket::bind(port);
   while (true) {
-    size_t num_bytes = udp.send((void *) data.c_str(), data.length(), destination);
-    cout << "Sent: " << num_bytes << endl;
+    std::span payload = string_to_span(data);
+    auto count = udp.send_to(server_ip, payload);
+    cout << "Sent: " << count << endl;
     this_thread::sleep_for(chrono::seconds(1));
   }
 }

@@ -59,20 +59,27 @@ public:
     return IpAddress{socket_address};
   }
 
+  explicit IpAddress(sockaddr_in socket_address)
+      : m_socket_address{socket_address} {}
+
   [[nodiscard]] sockaddr* as_sockaddr() const {
     return (sockaddr*) &m_socket_address;
   }
 
   [[nodiscard]] std::string to_string() const {
-    auto host = ntohs(m_socket_address.sin_addr.s_addr);
-    return detail::ip_host_to_string(host);
+    return detail::ip_host_to_string(as_host_short());
+  }
+
+  bool operator< (const IpAddress& other) const {
+    return as_host_short() < other.as_host_short();
   }
 
 private:
-  explicit IpAddress(sockaddr_in socket_address)
-      : m_socket_address{socket_address} {}
-
   sockaddr_in m_socket_address;
+
+  [[nodiscard]] std::uint32_t as_host_short() const {
+    return ntohs(m_socket_address.sin_addr.s_addr);
+  }
 };
 
 }

@@ -17,7 +17,6 @@ include_directories(.)
 add_executable(neptun
         main.cc
         ring_buffer.h
-        udp.h
         network.h udp_socket.h fake_network.h ip_address.h)
 
 
@@ -29,7 +28,7 @@ add_executable(
         tests
         ip_address_test.cc
         fake_network_test.cc
-)
+        udp_socket_test.cc)
 target_link_libraries(
         tests
         gtest_main
