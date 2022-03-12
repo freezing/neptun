@@ -17,23 +17,19 @@
 
 namespace freezing::network {
 
+// TODO: Move magic numbers to constants.h
+template<int C = 1600>
 class Ping {
-public:
-  template<int C>
-  static void write(IoBuffer<C> &buffer, std::uint32_t timestamp, const std::string &note) {
-    buffer.write_u32(timestamp);
-    buffer.write_string(note);
-  }
-};
-
-
-template<int C>
-class PingView {
 public:
   static constexpr std::size_t kTimestampOffset = 0;
   static constexpr std::size_t kNoteOffset = kTimestampOffset + sizeof(std::uint32_t);
 
-  explicit PingView(IoBuffer<C>& buffer) : m_buffer{buffer} {}
+  static void write(IoBuffer<C> &buffer, std::uint32_t timestamp, const std::string &note) {
+    buffer.write_u32(timestamp);
+    buffer.write_string(note);
+  }
+
+  explicit Ping(IoBuffer<C>& buffer) : m_buffer{buffer} {}
 
   std::uint32_t timestamp() const {
     m_buffer.seek(kTimestampOffset);
