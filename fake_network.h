@@ -61,7 +61,7 @@ public:
         detail::IpAddressOrSocketPredicate{fd, ip_address});
 
     if (it != m_bind.end()) {
-      throw std::runtime_error("IP " + ip_address.to_string() + " is already bind to a socket "
+      throw std::runtime_error("IP " + ip_address.to_string() + " is already bound to a socket "
                                    + std::to_string(fd.value));
     }
 

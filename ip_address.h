@@ -67,18 +67,23 @@ public:
   }
 
   [[nodiscard]] std::string to_string() const {
-    return detail::ip_host_to_string(as_host_short());
+    return detail::ip_host_to_string(ip_as_host_long()) + ":" + std::to_string(port());
+  }
+
+  [[nodiscard]] std::uint16_t port() const {
+    return ntohs(m_socket_address.sin_port);
   }
 
   bool operator< (const IpAddress& other) const {
-    return as_host_short() < other.as_host_short();
+    return ip_as_host_long() < other.ip_as_host_long()
+      || (ip_as_host_long() == other.ip_as_host_long() && port() < other.port());
   }
 
 private:
   sockaddr_in m_socket_address;
 
-  [[nodiscard]] std::uint32_t as_host_short() const {
-    return ntohs(m_socket_address.sin_addr.s_addr);
+  [[nodiscard]] std::uint32_t ip_as_host_long() const {
+    return ntohl(m_socket_address.sin_addr.s_addr);
   }
 };
 

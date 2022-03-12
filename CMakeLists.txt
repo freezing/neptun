@@ -28,7 +28,7 @@ add_executable(
         tests
         ip_address_test.cc
         fake_network_test.cc
-        udp_socket_test.cc)
+        udp_socket_test.cc testing_helpers.h)
 target_link_libraries(
         tests
         gtest_main

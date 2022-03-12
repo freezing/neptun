@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "fake_network.h"
+#include "testing_helpers.h"
 
 using namespace freezing::network;
 using namespace freezing::network::testing;
@@ -16,14 +17,6 @@ const std::size_t kMessageSize = strlen(kMessage);
 const std::span<std::uint8_t> payload((std::uint8_t *) (kMessage), kMessageSize);
 const auto ip = IpAddress::from_ipv4("192.168.0.10", 1000);
 const auto destination = IpAddress::from_ipv4("192.168.0.20", 1234);
-
-std::string span_to_string(std::span<std::uint8_t> data) {
-  std::string s{};
-  for (char c : data) {
-    s += c;
-  }
-  return s;
-}
 
 };
 
