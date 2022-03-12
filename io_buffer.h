@@ -104,17 +104,14 @@ public:
     return read_unsigned<std::uint32_t>();
   }
 
-  std::string read_string() {
+  std::string_view read_string() {
     assert(at_pos().size() >= sizeof(std::uint16_t));
     std::uint16_t length = read_u16();
+
     assert(length <= at_pos().size());
-    // TODO: Does C++ have a string_view?
-    std::string s{};
-    for (auto i = 0; i < length; i++) {
-      s += static_cast<char>(m_buffer[m_pos + i]);
-    }
+    auto string_buffer = at_pos();
     m_pos += length;
-    return s;
+    return std::string_view(reinterpret_cast<char*>(string_buffer.data()), length);
   }
 
   void flip() {

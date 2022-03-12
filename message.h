@@ -40,7 +40,7 @@ public:
     return m_buffer.read_u32();
   }
 
-  std::string note() const {
+  std::string_view note() const {
     m_buffer.seek(kNoteOffset);
     return m_buffer.read_string();
   }
