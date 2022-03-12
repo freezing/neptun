@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NEPTUN__UDP_H_
+#define NEPTUN__UDP_H_
 
 #include <string>
 #include <cstring>
@@ -64,3 +65,5 @@ class UdpSocket {
 
   UdpSocket(int socketfd, struct sockaddr_in socket_address) : m_socketfd{socketfd}, m_socket_address{socket_address} {}
 };
+
+#endif //NEPTUN__NETWORK_H_

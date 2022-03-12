@@ -35,3 +35,4 @@ perf.*
 
 # CMake
 cmake-build-debug/
+build/

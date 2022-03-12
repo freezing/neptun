@@ -1,4 +1,5 @@
-#pragma once
+#ifndef NEPTUN__RING_BUFFER_H_
+#define NEPTUN__RING_BUFFER_H_
 
 #include <span>
 
@@ -66,3 +67,5 @@ private:
     }
   }
 };
+
+#endif
