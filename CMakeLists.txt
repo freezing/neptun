@@ -28,9 +28,10 @@ add_executable(
         tests
         ip_address_test.cc
         fake_network_test.cc
-        udp_socket_test.cc testing_helpers.h)
+        udp_socket_test.cc testing_helpers.h message.h io_buffer_test.cc io_buffer.h message_test.cc)
 target_link_libraries(
         tests
+        gmock
         gtest_main
 )
 

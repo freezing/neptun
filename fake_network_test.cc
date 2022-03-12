@@ -38,15 +38,18 @@ TEST(FakeNetworkTest, BindSocket) {
 
 TEST(FakeNetworkTest, SendAndRead) {
   FakeNetwork network{};
-  auto socket = network.udp_socket_ipv4();
-  network.bind(socket, ip);
+  auto sender_socket = network.udp_socket_ipv4();
+  network.bind(sender_socket, ip);
 
-  std::size_t sent_count = network.send_to(socket, destination, payload);
+  auto receiver_socket = network.udp_socket_ipv4();
+  network.bind(receiver_socket, destination);
+
+  std::size_t sent_count = network.send_to(sender_socket, destination, payload);
   ASSERT_EQ(sent_count, kMessageSize);
 
   std::vector<std::uint8_t> buffer;
   buffer.resize(1500);
-  auto data = network.read_from_socket(socket, std::span(buffer));
+  auto data = network.read_from_socket(receiver_socket, std::span(buffer));
   ASSERT_EQ(span_to_string(data), "This is test message.");
 }
 
@@ -54,14 +57,17 @@ TEST(FakeNetworkTest, SendAndReadTooLargePacket) {
   const auto kMtu = 7;
 
   FakeNetwork network{kMtu};
-  auto socket = network.udp_socket_ipv4();
-  network.bind(socket, ip);
+  auto sender_socket = network.udp_socket_ipv4();
+  network.bind(sender_socket, ip);
 
-  std::size_t sent_count = network.send_to(socket, destination, payload);
+  auto receiver_socket = network.udp_socket_ipv4();
+  network.bind(receiver_socket, destination);
+
+  std::size_t sent_count = network.send_to(sender_socket, destination, payload);
   ASSERT_EQ(sent_count, kMessageSize);
 
   std::vector<std::uint8_t> buffer;
   buffer.resize(1500);
-  auto data = network.read_from_socket(socket, std::span(buffer));
+  auto data = network.read_from_socket(receiver_socket, std::span(buffer));
   ASSERT_EQ(span_to_string(data), "This is");
 }
