@@ -1,8 +1,12 @@
+# Example: https://cmake.org/examples/
+# Google test and CMake: https://google.github.io/googletest/quickstart-cmake.html
+
 include_directories(.)
 
 add_library(lib_network
         ring_buffer.h network.h udp_socket.h fake_network.h ip_address.h io_buffer.h message.h)
 set_target_properties(lib_network PROPERTIES LINKER_LANGUAGE CXX)
+target_include_directories(lib_network PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Tests
 

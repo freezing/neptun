@@ -9,13 +9,11 @@
 #include <span>
 
 #include "network.h"
+#include "io_buffer.h"
 
 namespace freezing::network {
 
-// Just enough to capture the whole MTU.
-constexpr int kDefaultBufferCapacity = 1600;
-
-template<typename Network, int BufferCapacity = kDefaultBufferCapacity>
+template<typename Network>
 class UdpSocket {
 public:
   static UdpSocket bind(IpAddress ip, Network &network) {
@@ -25,8 +23,9 @@ public:
     return socket;
   }
 
-  [[nodiscard]] std::span<std::uint8_t> read() {
-    return m_network.read_from_socket(m_fd, std::span(m_buffer.data(), m_buffer.size()));
+  template<int C>
+  [[nodiscard]] std::span<std::uint8_t> read(IoBuffer<C>& io_buffer) {
+    return m_network.read_from_socket(m_fd, std::span(io_buffer.at_pos()));
   }
 
   [[nodiscard]] std::size_t send_to(IpAddress ip_address,
@@ -45,7 +44,6 @@ private:
   Network &m_network;
   FileDescriptor m_fd;
   IpAddress m_ip;
-  std::array<std::uint8_t, BufferCapacity> m_buffer;
 
 };
 
