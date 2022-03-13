@@ -23,9 +23,8 @@ public:
     return socket;
   }
 
-  template<int C>
-  [[nodiscard]] std::span<std::uint8_t> read(IoBuffer<C>& io_buffer) {
-    return m_network.read_from_socket(m_fd, std::span(io_buffer.at_pos()));
+  [[nodiscard]] std::span<std::uint8_t> read(std::span<std::uint8_t> buffer) {
+    return m_network.read_from_socket(m_fd, buffer);
   }
 
   [[nodiscard]] std::size_t send_to(IpAddress ip_address,

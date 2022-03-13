@@ -18,32 +18,31 @@
 namespace freezing::network {
 
 // TODO: Move magic numbers to constants.h
-template<int C = 1600>
 class Ping {
 public:
   static constexpr std::size_t kTimestampOffset = 0;
   static constexpr std::size_t kNoteOffset = kTimestampOffset + sizeof(std::uint64_t);
 
-  static void write(IoBuffer<C> &buffer, std::uint64_t timestamp, const std::string &note) {
-    buffer.write_u64(timestamp);
-    buffer.write_string(note);
+  static std::span<std::uint8_t> write(std::span<std::uint8_t> buffer, std::uint64_t timestamp, const std::string &note) {
+    auto io = IoBuffer(buffer);
+    std::size_t byte_count = 0;
+    byte_count += io.write_u64(timestamp, kTimestampOffset);
+    byte_count += io.write_string(note, kNoteOffset);
+    return buffer.first(byte_count);
   }
 
-  explicit Ping(IoBuffer<C>& buffer) : m_buffer{buffer} {}
+  explicit Ping(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
 
   std::uint64_t timestamp() const {
-    // TODO: setting upper_bound doesn't make sense here.
-    m_buffer.seek(kTimestampOffset, 0);
-    return m_buffer.read_u32();
+    return m_buffer.read_u64(kTimestampOffset);
   }
 
   std::string_view note() const {
-    m_buffer.seek(kNoteOffset, 0);
-    return m_buffer.read_string();
+    return m_buffer.read_string(kNoteOffset);
   }
 
 private:
-  IoBuffer<C>& m_buffer;
+  IoBuffer m_buffer;
 };
 
 }
