@@ -1,0 +1,25 @@
+include_directories(.)
+
+add_library(lib_network
+        ring_buffer.h network.h udp_socket.h fake_network.h ip_address.h io_buffer.h message.h)
+set_target_properties(lib_network PROPERTIES LINKER_LANGUAGE CXX)
+
+# Tests
+
+include(FetchContent)
+
+add_executable(
+        network_tests
+        ip_address_test.cc
+        fake_network_test.cc
+        udp_socket_test.cc testing_helpers.h io_buffer_test.cc message_test.cc)
+
+target_link_libraries(
+        network_tests
+        lib_network
+        gmock
+        gtest_main
+)
+
+include(GoogleTest)
+gtest_discover_tests(network_tests)

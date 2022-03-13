@@ -14,26 +14,7 @@ FetchContent_MakeAvailable(googletest)
 
 include_directories(.)
 
-add_executable(neptun
-        main.cc
-        ring_buffer.h
-        network.h udp_socket.h fake_network.h ip_address.h)
-
-
-
-# Tests
 enable_testing()
 
-add_executable(
-        tests
-        ip_address_test.cc
-        fake_network_test.cc
-        udp_socket_test.cc testing_helpers.h message.h io_buffer_test.cc io_buffer.h message_test.cc)
-target_link_libraries(
-        tests
-        gmock
-        gtest_main
-)
+add_subdirectory(network)
 
-include(GoogleTest)
-gtest_discover_tests(tests)
