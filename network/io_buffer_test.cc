@@ -46,7 +46,7 @@ TEST(IoBufferTest, NetworkEndianessU8) {
   std::vector<std::uint8_t> buffer(1600);
   auto io = IoBuffer(buffer);
   io.write_u8(0xa1, 0);
-  auto actual = to_vec(io.byte_array(0, sizeof(std::uint8_t)));
+  auto actual = to_vec(io.read_byte_array(0, sizeof(std::uint8_t)));
   ASSERT_THAT(actual, testing::ElementsAre(0xa1));
 }
 
@@ -54,7 +54,7 @@ TEST(IoBufferTest, NetworkEndianessU16) {
   std::vector<std::uint8_t> buffer(1600);
   auto io = IoBuffer(buffer);
   ASSERT_EQ(io.write_u16(0x0102, 0), 2);
-  auto actual = to_vec(io.byte_array(0, sizeof(std::uint16_t)));
+  auto actual = to_vec(io.read_byte_array(0, sizeof(std::uint16_t)));
   ASSERT_THAT(actual, testing::ElementsAre(0x01, 0x02));
 }
 
@@ -62,6 +62,6 @@ TEST(IoBufferTest, NetworkEndianessU32) {
   std::vector<std::uint8_t> buffer(1600);
   auto io = IoBuffer(buffer);
   io.write_u32(0x01020304, 0);
-  auto actual = to_vec(io.byte_array(0, sizeof(std::uint32_t)));
+  auto actual = to_vec(io.read_byte_array(0, sizeof(std::uint32_t)));
   ASSERT_THAT(actual, testing::ElementsAre(0x01, 0x02, 0x03, 0x04));
 }

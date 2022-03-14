@@ -1,8 +1,8 @@
 include_directories(.)
 
-add_library(lib_neptun neptun.h messages/packet.h)
+add_library(lib_neptun neptun.h messages/packet.h messages/message_header.h messages/chat_text.h messages/segment.h reliable_stream.h)
+target_link_libraries(lib_neptun LINK_PUBLIC lib_common lib_network)
 set_target_properties(lib_neptun PROPERTIES LINKER_LANGUAGE CXX)
-target_link_libraries(lib_neptun LINK_PUBLIC lib_network)
 target_include_directories(lib_neptun PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # Example
@@ -15,14 +15,15 @@ target_link_libraries(bin_neptun lib_neptun)
 include(FetchContent)
 
 add_executable(
-        neptun_tests neptun_test.cc messages/packet_test.cc)
+        neptun_tests neptun_test.cc messages/packet_test.cc reliable_stream_test.cc)
 
 target_link_libraries(
         neptun_tests
         lib_neptun
+        lib_common
         gmock
         gtest_main
 )
 
 include(GoogleTest)
-#gtest_discover_tests(neptun_tests)
+gtest_discover_tests(neptun_tests)

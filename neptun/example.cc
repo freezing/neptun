@@ -5,6 +5,9 @@
 
 #include "network/udp_socket.h"
 #include "network/message.h"
+#include "neptun.h"
+#include "neptun/messages/chat_text.h"
+#include "neptun/messages/segment.h"
 
 using namespace std;
 using namespace freezing::network;
