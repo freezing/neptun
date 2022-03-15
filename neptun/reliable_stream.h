@@ -135,6 +135,7 @@ public:
   template<typename WriteToBufferFn>
   void send(WriteToBufferFn write_to_buffer) {
     flip();
+    // TODO: It's a nicer API for the user if [write_to_buffer] returns [usize].
     auto payload = write_to_buffer(buffer.remaining());
     if (!payload.empty()) {
       pending_messages.push_back({buffer.end_index(), buffer.end_index() + payload.size()});

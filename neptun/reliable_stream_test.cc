@@ -10,7 +10,8 @@
 #include "network/io_buffer.h"
 #include "neptun/reliable_stream.h"
 
-namespace freezing::network {
+using namespace freezing;
+using namespace freezing::network;
 
 namespace {
 
@@ -199,4 +200,38 @@ TEST(ReliableStreamTest, WritesMultipleMessagesPerPacketEachTime) {
   ASSERT_EQ(msg_count, kMaxNumMessagesPerPacket);
 }
 
+TEST(ReliableStreamTest, ReadsDuplicateMessageOnlyOnce) {
+  constexpr u32 kMessageCount = 1;
+  constexpr u32 kFirstPacketId = 1;
+  constexpr u32 kSecondPacketId = 2;
+
+  ReliableStream client{};
+  ReliableStream server{};
+
+  client.send([](byte_span buffer) {
+    auto count = IoBuffer(buffer).write_byte_array(span_of_string("foo"), 0);
+    return buffer.first(count);
+  });
+
+  usize msg_count = 0;
+
+  auto buffer1 = make_buffer();
+  auto payload1 = client.write(kFirstPacketId, buffer1);
+  server.read(kFirstPacketId, buffer1, [&msg_count](byte_span payload) {
+    msg_count++;
+    auto byte_array = IoBuffer(payload).read_byte_array(0, payload.size());
+    ASSERT_EQ(string_of_span(byte_array), "foo");
+  });
+
+  // Tell the client that the packet has failed, so it sends the same message again.
+  client.on_packet_delivery_status(kFirstPacketId, PacketDeliveryStatus::DROP);
+  auto buffer2 = make_buffer();
+  client.write(kSecondPacketId, buffer2);
+  auto payload2 = make_buffer();
+  server.read(kSecondPacketId, buffer2, [&msg_count](byte_span payload) {
+    msg_count++;
+    // Server shouldn't call this because it's already seen the same message.
+    FAIL();
+  });
+  ASSERT_EQ(msg_count, 1);
 }
