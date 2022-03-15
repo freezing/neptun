@@ -12,19 +12,29 @@
 #include "common/types.h"
 #include "network/network.h"
 #include "network/udp_socket.h"
+#include "neptun/messages/packet.h"
+#include "neptun/packet_delivery_manager.h"
 #include "neptun/reliable_stream.h"
 
 namespace freezing::network {
 
+namespace {
+constexpr usize kBigEnoughForMtu = 1600;
+}
+
 template<typename Network>
 class Neptun {
 public:
-  explicit Neptun(Network &network) : m_network{network} {}
+  explicit Neptun(Network &network, IpAddress ip) : m_udp_socket{
+      UdpSocket<Network>::bind(ip, network)}, m_read_packet_buffer(kBigEnoughForMtu) {}
 
   template<typename OnReliableFn>
-  void process(u64 now, OnReliableFn on_reliable) {
+  void read(u64 now, OnReliableFn on_reliable) {
     // TODO: Implement Neptun process where it reads a packet, sends it to the
     // delivery manager, reliablestream, and finally writes it to the peer.
+    auto payload = m_udp_socket.read(m_read_packet_buffer);
+    auto packet_header = PacketHeader(payload);
+
   }
 
   template<typename WriteToBufferFn>
@@ -34,8 +44,13 @@ public:
   }
 
 private:
-  Network &m_network;
+  // These can be organized into a single network handler (but i need a good name).
+  // e.g. std::map<IpAddress, SingleClientHandler> handlers, where SingleClientHandler has
+  // DeliveryStatusNotification, ReliableStream, etc.
+  std::map<IpAddress, PacketDeliveryManager> m_packet_delivery_managers;
   std::map<IpAddress, ReliableStream> m_reliable_streams{};
+  std::map<IpAddress, UdpSocket<Network>> m_udp_socket;
+  std::vector<u8> m_read_packet_buffer{};
 };
 
 }

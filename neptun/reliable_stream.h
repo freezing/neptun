@@ -12,17 +12,13 @@
 
 #include "common/types.h"
 #include "common/flip_buffer.h"
+#include "neptun/common.h"
 #include "network/network.h"
 #include "network/udp_socket.h"
 #include "neptun/messages/message_header.h"
 #include "neptun/messages/segment.h"
 
 namespace freezing::network {
-
-enum class PacketDeliveryStatus {
-  ACK,
-  DROP,
-};
 
 struct BufferRange {
   usize begin;

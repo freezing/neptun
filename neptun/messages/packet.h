@@ -6,21 +6,21 @@
 #define NEPTUN_NEPTUN_MESSAGES_PACKET_H
 
 #include "network/io_buffer.h"
+#include "common/types.h"
 
 namespace freezing::network {
 
 class PacketHeader {
 public:
-  static constexpr std::size_t kIdOffset = 0;
-  static constexpr std::size_t kAckSequenceNumberOffset = kIdOffset + sizeof(std::uint32_t);
-  static constexpr std::size_t kAckBitmaskOffset = kAckSequenceNumberOffset + sizeof(std::uint32_t);
+  static constexpr usize kIdOffset = 0;
+  static constexpr usize kAckSequenceNumberOffset = kIdOffset + sizeof(std::uint32_t);
+  static constexpr usize kAckBitmaskOffset = kAckSequenceNumberOffset + sizeof(std::uint32_t);
 
-  static std::span<std::uint8_t> write(std::span<std::uint8_t> buffer,
-                    std::uint32_t id,
-                    std::uint32_t ack_sequence_number,
-                    std::uint32_t ack_bitmask) {
+  static constexpr usize kSerializedSize = sizeof(u32) + sizeof(u32) + sizeof(u32);
+
+  static byte_span write(byte_span buffer, u32 id, u32 ack_sequence_number, u32 ack_bitmask) {
     auto io = IoBuffer(buffer);
-    std::size_t count = 0;
+    usize count = 0;
     count += io.write_u32(id, kIdOffset);
     count += io.write_u32(ack_sequence_number, kAckSequenceNumberOffset);
     count += io.write_u32(ack_bitmask, kAckBitmaskOffset);
@@ -29,15 +29,15 @@ public:
 
   explicit PacketHeader(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
 
-  std::uint32_t id() const {
+  u32 id() const {
     return m_buffer.read_u32(kIdOffset);
   }
 
-  std::uint32_t ack_sequence_number() const {
+  u32 ack_sequence_number() const {
     return m_buffer.read_u32(kAckSequenceNumberOffset);
   }
 
-  std::uint32_t ack_bitmask() const {
+  u32 ack_bitmask() const {
     return m_buffer.read_u32(kAckBitmaskOffset);
   }
 

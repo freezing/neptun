@@ -59,6 +59,8 @@ public:
     return IpAddress{socket_address};
   }
 
+  IpAddress(const IpAddress& other) = default;
+
   explicit IpAddress(sockaddr_in socket_address)
       : m_socket_address{socket_address} {}
 
