@@ -1,18 +1,37 @@
-//
-// Created by freezing on 12/03/2022.
-//
-
 #ifndef NEPTUN__NETWORK_H_
 #define NEPTUN__NETWORK_H_
+
+#define PLATFORM_WINDOWS 1
+#define PLATFORM_MAC 2
+#define PLATFORM_UNIX 3
+
+#if defined(_WIN32)
+#define PLATFORM PLATFORM_WINDOWS
+#elif defined (__APPLE__)
+#define PLATFORM PLATFORM_MAC
+#else
+#define PLATFORM PLATFORM_UNIX
+#endif
+
+#if PLATFORM == PLATFORM_WINDOWS
+
+#include <winsock2.h>
+#pragma comment( lib, "wsock32.lib" )
+
+#elif PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
+
+#include <unistd.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+
+#endif
 
 #include <span>
 #include <compare>
 #include <string>
 #include <memory>
 #include <memory.h>
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <fcntl.h>
 
 #include "ip_address.h"
 
@@ -30,7 +49,7 @@ struct FileDescriptor {
   auto operator<=>(const FileDescriptor &other) const = default;
 };
 
-class LinuxNetwork {
+class OsNetwork {
 public:
   void bind(FileDescriptor file_descriptor, IpAddress ip_address) {
     // https://man7.org/linux/man-pages/man2/bind.2.html.
@@ -39,7 +58,26 @@ public:
     }
   }
 
-  [[nodiscard]] FileDescriptor udp_socket_ipv4() {
+  void initialize() {
+#if PLATFORM == PLATFORM_WINDOWS
+    // We must call WSAStartup to initialize the sockets layer before calling any socket functions
+    // on Windows.
+    WSADATA wsa_data;
+    auto status = WSAStartup( MAKEWORD(2, 2), &wsa_data);
+    if (status != NO_ERROR) {
+      throw std::runtime_error("Failed to initialize socket on Windows.");
+    }
+#endif
+  }
+
+  void shutdown() {
+#if PLATFORM == PLATFORM_WINDOWS
+    // We must cleanup the windows sockets library when we are done with it.
+    WSACleanup();
+#endif
+  }
+
+  FileDescriptor udp_socket_ipv4() {
     // https://man7.org/linux/man-pages/man2/socket.2.html
     int fd = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (fd == -1) {
@@ -48,16 +86,38 @@ public:
     return FileDescriptor{fd};
   }
 
-  [[nodiscard]] void set_non_blocking(FileDescriptor fd) {
+  void set_non_blocking(FileDescriptor fd) {
+#if PLATFORM == PLATFORM_WINDOWS
+    // Windows does not provide the “fcntl” function, so we use the “ioctlsocket” function instead.
+    DWORD non_blocking = 1;
+    if (ioctlsocket(fd.value, FIONBIO, &non_blocking) != 0) {
+      throw std::runtime_error("Failed to set socket as non-blocking: " + std::to_string(fd.value));
+    }
+#elif PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
     int non_blocking = 1;
     if (fcntl(fd.value, F_SETFL, O_NONBLOCK, non_blocking) == -1) {
       throw std::runtime_error("Failed to set socket as non-blocking: " + std::to_string(fd.value));
     }
+#endif
+  }
+
+  void close_socket(FileDescriptor fd) {
+#if PLATFORM == PLATFORM_WINDOWS
+    if (closesocket(fd.value) == SOCKET_ERROR) {
+      int last_error = WSAGetLastError();
+      throw std::runtime_error("Failed to close socket: " + std::to_string(fd.value)
+        + " with error: " + std::to_string(last_error));
+    }
+#elif PLATFORM == PLATFORM_MAC || PLATFORM == PLATFORM_UNIX
+    if (close(fd.value) == -1) {
+      throw std::runtime_error("Failed to close socket: " + std::to_string(fd.value));
+    }
+#endif
   }
 
   // TODO: Use expect to return errors.
-  [[nodiscard]] std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
-                                                         std::span<std::uint8_t> buffer) {
+  std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
+                                           std::span<std::uint8_t> buffer) {
     // https://linux.die.net/man/2/recvfrom
     sockaddr_in sender_ip{};
     socklen_t sender_ip_length{};
@@ -75,9 +135,9 @@ public:
     return buffer.subspan(0, read_bytes);
   }
 
-  [[nodiscard]] std::size_t send_to(FileDescriptor fd,
-                                    IpAddress ip_address,
-                                    std::span<const std::uint8_t> payload) {
+  std::size_t send_to(FileDescriptor fd,
+                      IpAddress ip_address,
+                      std::span<const std::uint8_t> payload) {
     // https://linux.die.net/man/2/sendto
     ssize_t sent_bytes = ::sendto(fd.value,
                                   static_cast<const void *>(payload.data()),
@@ -92,7 +152,7 @@ public:
   }
 };
 
-static LinuxNetwork LINUX_NETWORK{};
+static OsNetwork OS_NETWORK{};
 
 }
 

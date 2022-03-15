@@ -20,7 +20,7 @@ int main(int argc, char **argv) {
 
   auto ip = IpAddress::from_ipv4(argv[1], stoi(argv[2]));
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
-  auto udp = UdpSocket<LinuxNetwork>::bind(ip, LINUX_NETWORK);
+  auto udp = UdpSocket<OsNetwork>::bind(ip, OS_NETWORK);
 
   std::vector<std::uint8_t> buffer(1600);
 
