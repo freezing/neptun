@@ -46,8 +46,20 @@ public:
     m_statuses.emplace_back(packet_id, PacketDeliveryStatus::DROP);
   }
 
+  // TODO: Implement iterator.
+  template<typename Fn>
+  void for_each(Fn fn) const {
+    for (auto[packet_id, status] : m_statuses) {
+      fn(packet_id, status);
+    }
+  }
+
+  std::vector<std::pair<u32, PacketDeliveryStatus>> to_vector() const {
+    return m_statuses;
+  }
+
 private:
-  std::vector<std::pair<u16, PacketDeliveryStatus>> m_statuses;
+  std::vector<std::pair<u32, PacketDeliveryStatus>> m_statuses;
 
 };
 
@@ -70,12 +82,17 @@ public:
 
   // TODO: Probably want better granularity for time, e.g. (ms) at least.
   DeliveryStatuses drop_old_packets(u64 now) {
+    DeliveryStatuses statuses{};
     while (!m_in_flight_packets.empty()) {
       auto in_flight = m_in_flight_packets.front();
-      if (in_flight.time_dispatched + m_packet_timeout_seconds >= now) {
-
+      if (in_flight.time_dispatched + m_packet_timeout_seconds <= now) {
+        statuses.add_drop(in_flight.id);
+        m_in_flight_packets.pop();
+      } else {
+        break;
       }
     }
+    return statuses;
   }
 
   usize write(byte_span buffer, u64 now) {
@@ -160,7 +177,7 @@ private:
       m_next_expected_packet_id = header.id() + 1;
       return PacketHeader::kSerializedSize;
     } else if (header.id() < m_next_expected_packet_id) {
-      // The packet is too old. If it's a duplicate, then  we have already processed it.
+      // The packet is too old. If it's a duplicate, then we have already processed it.
       // If not, we drop it!
       return 0;
     } else {
@@ -170,7 +187,7 @@ private:
       // going to wait for them.
       add_pending_ack(header.id());
       m_next_expected_packet_id = header.id() + 1;
-      return 0;
+      return PacketHeader::kSerializedSize;
     }
   }
 
