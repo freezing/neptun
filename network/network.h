@@ -12,6 +12,7 @@
 #include <memory.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <fcntl.h>
 
 #include "ip_address.h"
 
@@ -45,6 +46,13 @@ public:
       throw std::runtime_error("Couldn't create udp socket");
     }
     return FileDescriptor{fd};
+  }
+
+  [[nodiscard]] void set_non_blocking(FileDescriptor fd) {
+    int non_blocking = 1;
+    if (fcntl(fd.value, F_SETFL, O_NONBLOCK, non_blocking) == -1) {
+      throw std::runtime_error("Failed to set socket as non-blocking: " + std::to_string(fd.value));
+    }
   }
 
   // TODO: Use expect to return errors.

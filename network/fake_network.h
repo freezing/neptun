@@ -73,6 +73,10 @@ public:
     return FileDescriptor{fd};
   }
 
+  void set_non_blocking(FileDescriptor fd) {
+    // Fake sockets are always non-blocking for now.
+  }
+
   [[nodiscard]] std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
                                                          std::span<std::uint8_t> buffer) {
     auto ip = find_ip(fd);

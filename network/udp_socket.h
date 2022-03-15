@@ -19,7 +19,8 @@ public:
   static UdpSocket bind(IpAddress ip, Network &network) {
     auto fd = network.udp_socket_ipv4();
     UdpSocket socket{network, fd, ip};
-    socket.bind();
+    network.bind(fd, ip);
+    network.set_non_blocking(fd);
     return socket;
   }
 
@@ -35,10 +36,6 @@ public:
 private:
   UdpSocket(Network &network, FileDescriptor fd, IpAddress ip)
       : m_network{network}, m_fd{fd}, m_ip{ip} {}
-
-  void bind() {
-    m_network.bind(m_fd, m_ip);
-  }
 
   Network &m_network;
   FileDescriptor m_fd;
