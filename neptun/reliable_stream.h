@@ -66,6 +66,7 @@ public:
   }
 
   template<typename ReliableMessageCallback>
+  // TODO: Instead of a callback, maybe return a list of spans that represent reliable messages?
   usize read(u16 packet_id, byte_span buffer, ReliableMessageCallback callback) {
     if (Segment::kSerializedSize > buffer.size()) {
       return 0;

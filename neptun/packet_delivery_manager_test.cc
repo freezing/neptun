@@ -68,7 +68,7 @@ TEST(PacketDeliveryManagerTest, AcksAndDropsSentPackets) {
   // Packets 15(15+0), 16(15+1), 20(15+5), 23(15+8) and 25(15+10) are acked.
   constexpr u32 kAckBitmask = (1 << 0) | (1 << 1) | (1 << 5) | (1 << 8) | (1 << 10);
   PacketHeader::write(read_buffer, kPacketId, kAckSequenceNumber, kAckBitmask);
-  auto[read_count, delivery_statuses] = manager.process_read(read_buffer);
+  auto[read_count, delivery_statuses, packet_id] = manager.process_read(read_buffer);
   // It doesn't matter if we were able to read the packet(returned [read_count = 0],
   // e.g. if it's too old. We still process the acks.
   ASSERT_THAT(delivery_statuses.to_vector(), ElementsAre(
@@ -118,7 +118,7 @@ TEST(PacketDeliveryManagerTest, BoundaryAck) {
   // Packets 32(0+32).
   constexpr u32 kAckBitmask = (1 << 31);
   PacketHeader::write(read_buffer, kPacketId, kAckSequenceNumber, kAckBitmask);
-  auto[read_count, delivery_statuses] = manager.process_read(read_buffer);
+  auto[read_count, delivery_statuses, packet_id] = manager.process_read(read_buffer);
 
   ASSERT_THAT(delivery_statuses.to_vector(), ElementsAre(
       std::make_pair(0, PacketDeliveryStatus::DROP),
@@ -153,7 +153,7 @@ TEST(PacketDeliveryManagerTest, BoundaryAck) {
       std::make_pair(29, PacketDeliveryStatus::DROP),
       std::make_pair(30, PacketDeliveryStatus::DROP),
       std::make_pair(31, PacketDeliveryStatus::ACK)
-      ));
+  ));
 }
 
 TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
@@ -191,8 +191,9 @@ TEST(PacketDeliveryManagerTest, ReadsExpectedPackets) {
     auto ack_sequence_number = 0;
     auto ack_bitmask = 0;
     PacketHeader::write(buffer, packet_id, ack_sequence_number, ack_bitmask);
-    auto [read_byte_count, delivery_status_ignored] = manager.process_read(buffer);
+    auto[read_byte_count, delivery_status_ignored, actual_packet_id] = manager.process_read(buffer);
     ASSERT_EQ(read_byte_count, PacketHeader::kSerializedSize);
+    ASSERT_EQ(actual_packet_id, packet_id);
   }
 }
 
@@ -206,8 +207,9 @@ TEST(PacketDeliveryManagerTest, ReadsPacketsAfterExpected) {
   auto ack_sequence_number = 0;
   auto ack_bitmask = 0;
   PacketHeader::write(buffer, packet_id, ack_sequence_number, ack_bitmask);
-  auto [read_byte_count, delivery_status_ignored] = manager.process_read(buffer);
+  auto[read_byte_count, delivery_status_ignored, actual_packet_id] = manager.process_read(buffer);
   ASSERT_EQ(read_byte_count, PacketHeader::kSerializedSize);
+  ASSERT_EQ(actual_packet_id, packet_id);
 }
 
 TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
@@ -220,6 +222,7 @@ TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
   auto ack_sequence_number = 0;
   auto ack_bitmask = 0;
   PacketHeader::write(buffer, packet_id, ack_sequence_number, ack_bitmask);
-  auto [read_byte_count, delivery_status_ignored] = manager.process_read(buffer);
+  auto[read_byte_count, delivery_status_ignored, actual_packet_id] = manager.process_read(buffer);
   ASSERT_EQ(read_byte_count, 0);
+  ASSERT_EQ(packet_id, actual_packet_id);
 }

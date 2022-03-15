@@ -6,6 +6,7 @@
 #define NEPTUN_NEPTUN_PACKET_DELIVERY_MANAGER_H
 
 #include <algorithm>
+#include <tuple>
 #include <queue>
 
 #include "neptun/messages/packet.h"
@@ -73,11 +74,11 @@ public:
 
   // If the returned usize is 0, then the packet should not be processed.
   // It's either a duplicate or it is assumed to be dropped.
-  std::pair<usize, DeliveryStatuses> process_read(byte_span buffer) {
+  std::tuple<usize, DeliveryStatuses, u32> process_read(byte_span buffer) {
     auto header = PacketHeader(buffer);
     DeliveryStatuses statuses = process_acks(header.ack_sequence_number(), header.ack_bitmask());
     usize processed_byte_count = process_packet_header(header, buffer);
-    return {processed_byte_count, statuses};
+    return {processed_byte_count, statuses, header.id()};
   }
 
   // TODO: Probably want better granularity for time, e.g. (ms) at least.
