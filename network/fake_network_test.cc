@@ -50,7 +50,8 @@ TEST(FakeNetworkTest, SendAndRead) {
   std::vector<std::uint8_t> buffer;
   buffer.resize(1500);
   auto data = network.read_from_socket(receiver_socket, std::span(buffer));
-  ASSERT_EQ(span_to_string(data), "This is test message.");
+  ASSERT_EQ(span_to_string(data->payload), "This is test message.");
+  ASSERT_EQ(data->sender, ip);
 }
 
 TEST(FakeNetworkTest, SendAndReadTooLargePacket) {
@@ -69,5 +70,5 @@ TEST(FakeNetworkTest, SendAndReadTooLargePacket) {
   std::vector<std::uint8_t> buffer;
   buffer.resize(1500);
   auto data = network.read_from_socket(receiver_socket, std::span(buffer));
-  ASSERT_EQ(span_to_string(data), "This is");
+  ASSERT_EQ(span_to_string(data->payload), "This is");
 }

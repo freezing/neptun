@@ -33,7 +33,8 @@
 #include <memory>
 #include <memory.h>
 
-#include "ip_address.h"
+#include "common/types.h"
+#include "network/ip_address.h"
 
 namespace freezing::network {
 
@@ -47,6 +48,11 @@ struct FileDescriptor {
   int value;
 
   auto operator<=>(const FileDescriptor &other) const = default;
+};
+
+struct ReadPacketInfo {
+  IpAddress sender;
+  byte_span payload;
 };
 
 class OsNetwork {
@@ -116,8 +122,8 @@ public:
   }
 
   // TODO: Use expect to return errors.
-  std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
-                                           std::span<std::uint8_t> buffer) {
+  std::optional<ReadPacketInfo> read_from_socket(FileDescriptor fd,
+                                                 std::span<std::uint8_t> buffer) {
     // https://linux.die.net/man/2/recvfrom
     sockaddr_in sender_ip{};
     socklen_t sender_ip_length{};
@@ -131,8 +137,11 @@ public:
 
     if (read_bytes == -1) {
       throw std::runtime_error("Failed to read data from the socket: " + std::to_string(fd.value));
+    } else if (read_bytes == 0) {
+      return {};
+    } else {
+      return {{IpAddress(sender_ip), buffer.subspan(0, read_bytes)}};
     }
-    return buffer.subspan(0, read_bytes);
   }
 
   std::size_t send_to(FileDescriptor fd,

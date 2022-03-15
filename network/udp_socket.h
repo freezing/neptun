@@ -24,7 +24,7 @@ public:
     return socket;
   }
 
-  [[nodiscard]] std::span<std::uint8_t> read(std::span<std::uint8_t> buffer) {
+  [[nodiscard]] std::optional<ReadPacketInfo> read(std::span<std::uint8_t> buffer) {
     return m_network.read_from_socket(m_fd, buffer);
   }
 

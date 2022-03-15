@@ -29,6 +29,7 @@ struct BufferRange {
     assert(end >= value);
     begin -= value;
     end -= value;
+    return *this;
   }
 };
 

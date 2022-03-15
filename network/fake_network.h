@@ -19,10 +19,13 @@ namespace detail {
 
 constexpr int kReasonableMtu = 1400;
 
-using PacketPayload = std::vector<std::uint8_t>;
+struct PendingPacket {
+  IpAddress sender;
+  std::vector<u8> payload;
+};
 
 struct UdpPackets {
-  std::queue<PacketPayload> packets;
+  std::queue<PendingPacket> packets;
 };
 
 struct SocketPredicate {
@@ -77,7 +80,7 @@ public:
     // Fake sockets are always non-blocking for now.
   }
 
-  [[nodiscard]] std::span<std::uint8_t> read_from_socket(FileDescriptor fd,
+  std::optional<ReadPacketInfo> read_from_socket(FileDescriptor fd,
                                                          std::span<std::uint8_t> buffer) {
     auto ip = find_ip(fd);
     if (!ip) {
@@ -85,7 +88,7 @@ public:
     }
     auto& udp_packets = m_buffers[*ip];
     if (udp_packets.packets.empty()) {
-      return std::span<std::uint8_t>{};
+      return {};
     }
     auto packet = std::move(udp_packets.packets.front());
     udp_packets.packets.pop();
@@ -93,13 +96,13 @@ public:
     // Any data in the packet that can't fit in the buffer is dropped.
     int idx = 0;
     for (auto it = buffer.begin(); it != buffer.end(); it++) {
-      if (idx >= packet.size()) {
+      if (idx >= packet.payload.size()) {
         // No more data to read.
         break;
       }
-      *it = packet[idx++];
+      *it = packet.payload[idx++];
     }
-    return buffer.subspan(0, idx);
+    return {{packet.sender, {buffer.subspan(0, idx)}}};
   }
 
   [[nodiscard]] std::size_t send_to(FileDescriptor fd,
@@ -109,11 +112,13 @@ public:
       throw std::runtime_error("Failed to send data via unbound socket: " + std::to_string(fd.value));
     }
     auto& buffer = m_buffers[ip_address];
-    buffer.packets.push(std::vector(payload.begin(), payload.end()));
+    // Safety: sender exists because [is_socket_bound] is satisfied.
+    auto sender = *find_ip(fd);
+    buffer.packets.push({sender, std::vector(payload.begin(), payload.end())});
     // Limit packet payload to the size of MTU.
-    auto& packet_payload = buffer.packets.back();
-    if (packet_payload.size() > m_mtu) {
-      packet_payload.erase(packet_payload.begin() + m_mtu, packet_payload.end());
+    auto& pending_packet = buffer.packets.back();
+    if (pending_packet.payload.size() > m_mtu) {
+      pending_packet.payload.erase(pending_packet.payload.begin() + m_mtu, pending_packet.payload.end());
     }
     return payload.size();
   }

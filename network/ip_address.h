@@ -81,6 +81,10 @@ public:
       || (ip_as_host_long() == other.ip_as_host_long() && port() < other.port());
   }
 
+  bool operator== (const IpAddress& other) const {
+    return !(*this < other) && !(other < *this);
+  }
+
 private:
   sockaddr_in m_socket_address;
 

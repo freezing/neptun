@@ -26,12 +26,12 @@ TEST(UdpSocket, SendAndReceivePacket) {
   FakeNetwork network{};
   auto udp_server = UdpSocket<FakeNetwork>::bind(server_ip, network);
   auto udp_client = UdpSocket<FakeNetwork>::bind(client_ip, network);
-  ASSERT_EQ(udp_server.read(buffer).size(), 0);
-  ASSERT_EQ(udp_client.read(buffer).size(), 0);
+  ASSERT_EQ(udp_server.read(buffer)->payload.size(), 0);
+  ASSERT_EQ(udp_client.read(buffer)->payload.size(), 0);
 
   auto sent_count = udp_server.send_to(client_ip, payload);
   ASSERT_EQ(sent_count, kMessageSize);
 
   auto read_data = udp_client.read(buffer);
-  ASSERT_EQ(span_to_string(read_data), "This is test message.");
+  ASSERT_EQ(span_to_string(read_data->payload), "This is test message.");
 }

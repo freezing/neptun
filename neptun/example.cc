@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
          << endl;
 
     // Read packet.
-    auto payload = udp.read(buffer);
+    auto payload = udp.read(buffer)->payload;
     auto read_ping = Ping(payload);
     cout << "Read: Ping(timestamp = " << read_ping.timestamp() << ", note = " << read_ping.note()
          << endl;
