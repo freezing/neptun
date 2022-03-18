@@ -1,8 +1,0 @@
-//
-// Created by freezing on 14/03/2022.
-//
-
-#ifndef NEPTUN_NEPTUN_MESSAGES_CHAT_TEXT_H
-#define NEPTUN_NEPTUN_MESSAGES_CHAT_TEXT_H
-
-#endif //NEPTUN_NEPTUN_MESSAGES_CHAT_TEXT_H

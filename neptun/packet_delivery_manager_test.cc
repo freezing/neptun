@@ -226,3 +226,34 @@ TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
   ASSERT_EQ(read_byte_count, 0);
   ASSERT_EQ(packet_id, actual_packet_id);
 }
+
+TEST(PacketDeliveryManagerTest, WriteAndReadPacketWithAcks) {
+  auto buffer = make_buffer();
+  PacketDeliveryManager server{0};
+  PacketDeliveryManager client{0};
+
+  {
+    auto write_count = server.write(buffer, kNow);
+    ASSERT_GT(write_count, 0);
+  }
+
+  {
+    // Pretend the packet is dropped, and send a new one.
+    server.write(buffer, kNow);
+    {
+      auto[read_count, delivery_statuses, packet_id] = client.process_read(buffer);
+      ASSERT_THAT(delivery_statuses.to_vector(), IsEmpty());
+      ASSERT_EQ(packet_id, 1);
+    }
+
+    // Client drops packet 0, and acks packet 1.
+    client.write(buffer, kNow);
+    {
+      auto[write_count, delivery_statuses, packet_id] = server.process_read(buffer);
+      ASSERT_THAT(delivery_statuses.to_vector(),
+                  ElementsAre(std::make_pair(0, PacketDeliveryStatus::DROP),
+                              std::make_pair(1, PacketDeliveryStatus::ACK)));
+      ASSERT_EQ(packet_id, 0);
+    }
+  }
+}

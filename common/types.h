@@ -17,6 +17,10 @@ using u64 = std::uint64_t;
 using usize = std::size_t;
 using byte_span = std::span<u8>;
 
+inline byte_span advance(byte_span span, usize count) {
+  return span.last(span.size() - count);
+}
+
 }
 
 #endif //NEPTUN_COMMON_COMMON_H

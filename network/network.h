@@ -135,6 +135,8 @@ public:
                                     (struct sockaddr *) &sender_ip,
                                     &sender_ip_length);
 
+    // TODO: Need to handle WOULDBLOCK error.
+
     if (read_bytes == -1) {
       throw std::runtime_error("Failed to read data from the socket: " + std::to_string(fd.value));
     } else if (read_bytes == 0) {
@@ -154,7 +156,8 @@ public:
                                   detail::kNoFlags,
                                   (struct sockaddr *) &ip_address,
                                   sizeof(ip_address));
-    if (sent_bytes == -1) {
+    // When sending a UDP packet, we expect all data to be sent.
+    if (sent_bytes != payload.size()) {
       throw std::runtime_error("Failed to sent bytes to: " + ip_address.to_string());
     }
     return static_cast<std::size_t>(sent_bytes);

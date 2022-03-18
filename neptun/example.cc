@@ -8,7 +8,6 @@
 #include "neptun.h"
 #include "neptun/common.h"
 #include "neptun/packet_delivery_manager.h"
-#include "neptun/messages/chat_text.h"
 #include "neptun/messages/segment.h"
 
 using namespace std;

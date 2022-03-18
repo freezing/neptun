@@ -105,15 +105,21 @@ public:
     return {{packet.sender, {buffer.subspan(0, idx)}}};
   }
 
-  [[nodiscard]] std::size_t send_to(FileDescriptor fd,
+  [[nodiscard]] std::size_t send_to(FileDescriptor sender_fd,
                                     IpAddress ip_address,
                                     std::span<const std::uint8_t> payload) {
-    if (!is_socket_bound(fd)) {
-      throw std::runtime_error("Failed to send data via unbound socket: " + std::to_string(fd.value));
+    if (!is_socket_bound(sender_fd)) {
+      throw std::runtime_error("Failed to send data via unbound socket: " + std::to_string(sender_fd.value));
     }
+    if (m_should_drop_packets) {
+      // Even though the packet is dropped, we pretend it was sent.
+      // This is what UDP socket would do.
+      return payload.size();
+    }
+
     auto& buffer = m_buffers[ip_address];
     // Safety: sender exists because [is_socket_bound] is satisfied.
-    auto sender = *find_ip(fd);
+    auto sender = *find_ip(sender_fd);
     buffer.packets.push({sender, std::vector(payload.begin(), payload.end())});
     // Limit packet payload to the size of MTU.
     auto& pending_packet = buffer.packets.back();
@@ -123,9 +129,14 @@ public:
     return payload.size();
   }
 
+  void drop_packets(bool should_drop_packets) {
+    m_should_drop_packets = should_drop_packets;
+  }
+
 private:
   int m_mtu;
   int m_next_fd{};
+  bool m_should_drop_packets{false};
   std::vector<std::pair<IpAddress, FileDescriptor>> m_bind{};
   std::map<IpAddress, detail::UdpPackets> m_buffers{};
 

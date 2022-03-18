@@ -24,7 +24,7 @@ struct InFlightPacket {
   u64 time_dispatched;
 };
 
-std::optional<u32> most_significant_bit(u32 value) {
+static std::optional<u32> most_significant_bit(u32 value) {
   std::optional<u32> msb{};
   for (u32 bit = 0; bit < sizeof(u32) * 8; bit++) {
     u32 mask = 1 << bit;
@@ -122,6 +122,7 @@ public:
         }
         m_pending_acks.pop();
       }
+      PacketHeader::write(buffer, packet_id, ack_sequence_number, ack_bitmask);
       return PacketHeader::kSerializedSize;
     }
   }

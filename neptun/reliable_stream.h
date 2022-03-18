@@ -40,7 +40,7 @@ struct InFlightMessage {
 
 class ReliableStream {
 public:
-  explicit ReliableStream(usize buffer_capacity = 3200) : buffer(buffer_capacity) {}
+  explicit ReliableStream(usize buffer_capacity = 3200) : m_buffer(buffer_capacity) {}
 
   void on_packet_delivery_status(u32 packet_id, PacketDeliveryStatus status) {
     switch (status) {
@@ -136,39 +136,39 @@ public:
   void send(WriteToBufferFn write_to_buffer) {
     flip();
     // TODO: It's a nicer API for the user if [write_to_buffer] returns [usize].
-    auto payload = write_to_buffer(buffer.remaining());
+    auto payload = write_to_buffer(m_buffer.remaining());
     if (!payload.empty()) {
-      pending_messages.push_back({buffer.end_index(), buffer.end_index() + payload.size()});
-      buffer.advance(payload.size());
+      pending_messages.push_back({m_buffer.end_index(), m_buffer.end_index() + payload.size()});
+      m_buffer.advance(payload.size());
     }
   }
 
 private:
-  FlipBuffer<u8> buffer;
+  FlipBuffer<u8> m_buffer;
   std::queue<InFlightMessage> in_flight_messages;
   std::deque<BufferRange> pending_messages;
 
   byte_span buffer_span(BufferRange range) {
-    return {buffer.begin() + range.begin, buffer.begin() + range.end};
+    return {m_buffer.begin() + range.begin, m_buffer.begin() + range.end};
   }
 
   void flip() {
-    if (buffer.begin_index() > 0) {
+    if (m_buffer.begin_index() > 0) {
       // A "creative" solution:
       // Pop each element from the queue and put it back.
       // Repeat that queue.size() times, and we have effectively iterated over the elements in the
       // queue.
       for (usize i = 0; i < in_flight_messages.size(); i++) {
         auto msg = in_flight_messages.front();
-        msg.range -= buffer.begin_index();
+        msg.range -= m_buffer.begin_index();
         in_flight_messages.push(msg);
       }
 
       for (auto& range : pending_messages) {
-        range -= buffer.begin_index();
+        range -= m_buffer.begin_index();
       }
 
-      buffer.flip();
+      m_buffer.flip();
     }
   }
 
