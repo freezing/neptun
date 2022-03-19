@@ -8,6 +8,7 @@
 #include <array>
 #include <memory.h>
 #include <cassert>
+#include <cmath>
 #include <span>
 #include <string>
 #include <cinttypes>
@@ -104,7 +105,11 @@ public:
   }
 
   std::span<std::uint8_t> read_byte_array(usize idx, std::size_t length) const {
-    return m_buffer.subspan(idx, length);
+    // TODO: Is this the best place to cutoff the packet?
+    // Maybe it's better to detect malicious buffers at the higher level instead of cutting them
+    // off. This doesn't provide additional info that the packet is corrupt.
+    usize max_length = std::min(m_buffer.size() - idx, length);
+    return m_buffer.subspan(idx, max_length);
   }
 
 private:

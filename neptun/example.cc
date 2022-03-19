@@ -9,6 +9,7 @@
 #include "neptun/common.h"
 #include "neptun/packet_delivery_manager.h"
 #include "neptun/messages/segment.h"
+#include "neptun/messages/reliable_message.h"
 
 using namespace std;
 using namespace freezing::network;

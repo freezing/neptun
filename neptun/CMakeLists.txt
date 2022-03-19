@@ -1,6 +1,6 @@
 include_directories(.)
 
-add_library(lib_neptun neptun.h messages/packet_header.h messages/message_header.h messages/segment.h reliable_stream.h common.h packet_delivery_manager.h)
+add_library(lib_neptun neptun.h messages/packet_header.h messages/message_header.h messages/segment.h reliable_stream.h common.h packet_delivery_manager.h messages/reliable_message.h)
 target_link_libraries(lib_neptun LINK_PUBLIC lib_common lib_network)
 set_target_properties(lib_neptun PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(lib_neptun PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

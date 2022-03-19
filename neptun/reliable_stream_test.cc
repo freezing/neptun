@@ -238,3 +238,7 @@ TEST(ReliableStreamTest, ReadsDuplicateMessageOnlyOnce) {
   });
   ASSERT_EQ(msg_count, 1);
 }
+
+TEST(ReliableStreamTest, SendMaliciousPacket) {
+  FAIL();
+}

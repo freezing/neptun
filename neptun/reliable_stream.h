@@ -17,6 +17,7 @@
 #include "network/udp_socket.h"
 #include "neptun/messages/message_header.h"
 #include "neptun/messages/segment.h"
+#include "neptun/messages/reliable_message.h"
 
 namespace freezing::network {
 
@@ -24,7 +25,7 @@ struct BufferRange {
   usize begin;
   usize end;
 
-  BufferRange& operator -= (usize value) {
+  BufferRange &operator-=(usize value) {
     assert(begin >= value);
     assert(end >= value);
     begin -= value;
@@ -83,23 +84,20 @@ public:
     }
     usize idx = Segment::kSerializedSize;
     for (int i = 0; i < segment.message_count(); i++) {
-      auto io = IoBuffer{buffer};
-      // TODO: Read ReliableMessage.
-      u32 sequence_number = io.read_u32(idx);
-      usize length = io.read_u16(idx + sizeof(u32));
-      if (sizeof(u32) + length + sizeof(u16) > buffer.size()) {
+      ReliableMessage reliable_message(advance(buffer, idx));
+      const auto msg_size = reliable_message.serialized_size();
+      if (msg_size > buffer.size() - idx) {
         // A bad packet. Report an error instead of logging.
         std::cout << "Bad packet: " << packet_id << std::endl;
         break;
       }
-      auto byte_array = io.read_byte_array(idx + sizeof(u32) + sizeof(u16), length);
-      idx += sizeof(u32) + sizeof(u16) + length;
+      idx += msg_size;
 
       // It's important that we process all messages so that the buffer pointer is updated
       // correctly.
-      if (sequence_number == m_next_expected_sequence_number) {
+      if (reliable_message.sequence_number() == m_next_expected_sequence_number) {
         m_next_expected_sequence_number++;
-        callback(byte_array);
+        callback(reliable_message.payload());
       }
     }
     return idx;
@@ -110,9 +108,8 @@ public:
     usize total_size = Segment::kSerializedSize;
     usize message_count = 0;
     for (auto pending_msg : pending_messages) {
-      auto msg_span = buffer_span(pending_msg.range);
-      // TODO: Get serialized size for ReliableMessage.
-      usize msg_size = sizeof(u32) + sizeof(u16) + msg_span.size();
+      auto payload = buffer_span(pending_msg.range);
+      const usize msg_size = ReliableMessage::serialized_size(payload.size());
       if (total_size + msg_size > buffer.size()) {
         break;
       }
@@ -135,13 +132,13 @@ public:
       pending_messages.pop_front();
       in_flight_messages.push({packet_id, pending_msg.range});
 
-      usize total_message_size = sizeof(u32) + payload.size() + sizeof(u16);
-      assert(total_message_size <= buffer.size());
+      auto reliable_message_buffer = ReliableMessage::write(advance(buffer, idx),
+                             pending_msg.sequence_number,
+                             payload.size(),
+                             payload);
 
-      // TODO: Extract this into ReliableMessage.
-      io.write_u32(pending_msg.sequence_number, idx);
-      io.write_u16(payload.size(), idx + sizeof(u32));
-      io.write_byte_array(payload, idx + sizeof(u32) + sizeof(u16));
+      usize total_message_size = reliable_message_buffer.size();
+      assert(total_message_size <= buffer.size() - idx);
       idx += total_message_size;
     }
     assert(idx == total_size);
@@ -155,7 +152,8 @@ public:
     auto payload = write_to_buffer(m_buffer.remaining());
     if (!payload.empty()) {
       auto sequence_number = m_next_outgoing_sequence_number++;
-      pending_messages.push_back({m_buffer.end_index(), m_buffer.end_index() + payload.size(), sequence_number});
+      pending_messages.push_back({m_buffer.end_index(), m_buffer.end_index() + payload.size(),
+                                  sequence_number});
       m_buffer.advance(payload.size());
     }
   }
@@ -183,7 +181,7 @@ private:
         in_flight_messages.push(in_flight_msg);
       }
 
-      for (auto& pending_msg : pending_messages) {
+      for (auto &pending_msg : pending_messages) {
         pending_msg.range -= m_buffer.begin_index();
       }
 
