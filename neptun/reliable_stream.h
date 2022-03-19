@@ -45,6 +45,9 @@ struct InFlightMessage {
   PendingMessage message;
 };
 
+// TODO: Can handle dropped messages more efficiently, e.g. by having a window of reliable messages
+// that are acked and only resending the ones that are dropped.
+// This is required on the sender and on the receiver side.
 class ReliableStream {
 public:
   explicit ReliableStream(usize buffer_capacity = 3200) : m_buffer(buffer_capacity) {}
@@ -60,7 +63,9 @@ public:
     case PacketDeliveryStatus::DROP:assert(
           in_flight_messages.empty() || in_flight_messages.front().packet_id >= packet_id);
       std::stack<PendingMessage> reversed_messages;
-      while (!in_flight_messages.empty() && in_flight_messages.front().packet_id == packet_id) {
+      // TODO: Very inefficient. We drop all in-flight messages sent after the one that is dropped.
+      //  We can be smarted and only retry the ones that are dropped.
+      while (!in_flight_messages.empty() && in_flight_messages.front().packet_id >= packet_id) {
         reversed_messages.push(in_flight_messages.front().message);
         in_flight_messages.pop();
       }
@@ -138,7 +143,7 @@ public:
       auto pending_msg = pending_messages.front();
       auto payload = buffer_span(pending_msg.range);
       pending_messages.pop_front();
-      in_flight_messages.push({packet_id, pending_msg.range});
+      in_flight_messages.push({packet_id, pending_msg});
 
       auto reliable_message_buffer = ReliableMessage::write(advance(buffer, idx),
                              pending_msg.sequence_number,

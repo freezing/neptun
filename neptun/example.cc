@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     time_since_last_reliable_msg_ms += elapsed_time;
     // TODO: Create a concept that ticks given frequency.
     if (time_since_last_reliable_msg_ms >= kReliableMessageIntervalMs) {
-      std::cout << "Sending reliable message" << std::endl;
+      std::cout << "Sending reliable message to " << peer_ip.to_string() << std::endl;
       time_since_last_reliable_msg_ms -= kReliableMessageIntervalMs;
       neptun.send_reliable_to(peer_ip, [&reliable_msg_seq_num](byte_span buffer) {
         reliable_msg_seq_num++;
@@ -59,7 +59,9 @@ int main(int argc, char **argv) {
     }
 
     neptun.tick(elapsed_time, [](byte_span buffer) {
-      std::cout << "Read: " << span_to_string(buffer) << std::endl;
+      IoBuffer io{buffer};
+      auto s = io.read_string(0);
+      std::cout << "Read ["  << "]: " << s << std::endl;
     });
 
     previous_tick_time = now;

@@ -114,7 +114,7 @@ private:
   }
 
   void write_to_peer(u64 now, IpAddress ip, Peer &peer) {
-    byte_span buffer(m_network_buffer);
+     byte_span buffer(m_network_buffer);
 
     // Packet Delivery Manager stage.
     auto packet_header_count = peer.packet_delivery_manager.write(buffer, now);

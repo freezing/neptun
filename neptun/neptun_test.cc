@@ -141,6 +141,48 @@ TEST(NeptunTest, Timeouts) {
   ASSERT_EQ(msg_count, 1);
 }
 
+TEST(NeptunTest, ReliableMessageAfterDroppingMultiplePackets) {
+  FakeNetwork fake_network{};
+  Neptun server{fake_network, kServerIp};
+  Neptun client{fake_network, kClientIp};
+
+  auto send_to_server = [&client](usize sequence_number) {
+    client.send_reliable_to(kServerIp, [sequence_number](byte_span buffer) {
+      IoBuffer io{buffer};
+      auto count = io.write_string("this is test string " + std::to_string(sequence_number), 0);
+      return buffer.first(count);
+    });
+  };
+
+  // Drop first 5 packets.
+  fake_network.drop_packets(true);
+  for (usize sequence_number = 0; sequence_number < 5; sequence_number++) {
+    send_to_server(sequence_number);
+    client.tick(kNow, unexpected_reliable_msgs);
+  }
+
+  // Add one more reliable message.
+  // The packets are received on the server-side.
+  fake_network.drop_packets(false);
+  send_to_server(5);
+  client.tick(kNow, unexpected_reliable_msgs);
+  // Server doesn't receive any reliable messages yet, because the last one that succeeded
+  // is dropped due to not being sent in order.
+  server.tick(kNow, unexpected_reliable_msgs);
+
+  // Client receives acks that the first 5 packets are dropped.
+  // It sends all messages to the server again.
+  client.tick(kNow, unexpected_reliable_msgs);
+
+  usize msg_count = 0;
+  server.tick(kNow, [&msg_count](byte_span buffer) {
+    IoBuffer io{buffer};
+    ASSERT_EQ(io.read_string(0), "this is test string " + std::to_string(msg_count));
+    msg_count++;
+  });
+  ASSERT_EQ(msg_count, 6);
+}
+
 TEST(NeptunTest, IgnoresPacketsForUnrelatedProtocol) {
   FAIL();
 }
