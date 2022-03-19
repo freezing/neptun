@@ -22,6 +22,10 @@ class IoBuffer {
 public:
   IoBuffer(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
 
+  usize size() const {
+    return m_buffer.size();
+  }
+
   template<typename T>
   std::size_t write_unsigned(T value, usize idx) {
     static_assert(std::is_same_v<T, std::uint64_t> || std::is_same_v<T, std::uint32_t>

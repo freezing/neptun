@@ -15,6 +15,7 @@
 #include "neptun/common.h"
 #include "network/network.h"
 #include "network/udp_socket.h"
+#include "neptun/error.h"
 #include "neptun/messages/message_header.h"
 #include "neptun/messages/segment.h"
 #include "neptun/messages/reliable_message.h"
@@ -73,27 +74,32 @@ public:
 
   template<typename ReliableMessageCallback>
   // TODO: Instead of a callback, maybe return a list of spans that represent reliable messages?
-  usize read(u16 packet_id, byte_span buffer, ReliableMessageCallback callback) {
+  expected<usize, NeptunError> read(u16 packet_id, byte_span buffer, ReliableMessageCallback callback) {
     if (Segment::kSerializedSize > buffer.size()) {
+      // No segment to read.
       return 0;
     }
 
     auto segment = Segment(buffer);
     if (segment.manager_type() != ManagerType::RELIABLE_STREAM) {
+      // The segment is for another manager.
+      // This probably means that the ReliableStream segment doesn't exist.
       return 0;
     }
     usize idx = Segment::kSerializedSize;
     for (int i = 0; i < segment.message_count(); i++) {
       // TODO: Advance buffer and then [buffer.size() - idx] is ugly. Refactor.
       // The same in other places.
+      // TODO: What if buffer is malformed. I need a better mechanism to deal with this in a
+      // generic way. E.g. maybe ReliableMessage (and similar msgs) should only provide
+      // validate_size API?
       ReliableMessage reliable_message(advance(buffer, idx));
-      const auto msg_size = reliable_message.serialized_size();
-      if (msg_size > buffer.size() - idx) {
-        // A bad packet. Report an error instead of logging.
-        std::cout << "Bad packet: " << packet_id << std::endl;
-        break;
+      const auto msg_size = reliable_message.validate_size();
+      if (!msg_size) {
+        // A packet is malformed.
+        return make_error(NeptunError::MALFORMED_PACKET);
       }
-      idx += msg_size;
+      idx += *msg_size;
 
       // It's important that we process all messages so that the buffer pointer is updated
       // correctly.

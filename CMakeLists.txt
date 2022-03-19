@@ -12,6 +12,12 @@ FetchContent_Declare(
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
+FetchContent_Declare(
+        expected
+        URL https://github.com/TartanLlama/expected/archive/refs/tags/v1.0.0.zip
+)
+FetchContent_MakeAvailable(expected)
+
 include_directories(.)
 
 enable_testing()

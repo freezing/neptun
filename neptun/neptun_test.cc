@@ -13,7 +13,7 @@ static const IpAddress kClientIp = IpAddress::from_ipv4("192.168.0.11", 12345);
 // 2022-03-15 21:18:41 GMT (not relevant, but doesn't hurt to know).
 constexpr u64 kNow = 1647379116;
 
-auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
+const auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
 }
 
 TEST(NeptunTest, ReadAndWriteSingleReliableMessage) {

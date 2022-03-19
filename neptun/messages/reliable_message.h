@@ -10,6 +10,11 @@
 
 namespace freezing::network {
 
+// TODO: Extract into its own file.
+enum class EncodingError {
+  MALFORMED_BUFFER = 0
+};
+
 class ReliableMessage {
 public:
   static constexpr usize kSequenceNumberOffset = 0;
@@ -45,6 +50,20 @@ public:
 
   usize serialized_size() const {
     return sizeof(u32) + sizeof(u16) + m_buffer.read_u16(kLengthOffset);
+  }
+
+  expected<usize, EncodingError> validate_size() const {
+    usize minimum_size = sizeof(u32) + sizeof(u16);
+    if (minimum_size > m_buffer.size()) {
+      return make_error(EncodingError::MALFORMED_BUFFER);
+    }
+    usize total_size = minimum_size + length();
+    // ReliableMessage must not have length=0 because it makes no sense to waste bandwidth
+    // on an empty message.
+    if (total_size > m_buffer.size() || total_size == minimum_size) {
+      return make_error(EncodingError::MALFORMED_BUFFER);
+    }
+    return {total_size};
   }
 
 private:

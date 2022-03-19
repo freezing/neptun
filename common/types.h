@@ -7,6 +7,7 @@
 
 #include <cinttypes>
 #include <span>
+#include <tl/expected.hpp>
 
 namespace freezing {
 
@@ -19,6 +20,17 @@ using byte_span = std::span<u8>;
 
 inline byte_span advance(byte_span span, usize count) {
   return span.last(span.size() - count);
+}
+
+template<class T, class E>
+using expected = tl::expected<T, E>;
+
+template<class E>
+using Error = tl::unexpected<E>;
+
+template<typename E>
+Error<E> make_error(E&& e) {
+  return Error<typename std::decay<E>::type>(std::forward<E>(e));
 }
 
 }

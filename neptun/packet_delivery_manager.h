@@ -72,6 +72,7 @@ public:
       next_expected_packet_id}, m_packet_timeout_seconds{
       packet_timeout_seconds} {}
 
+  // TODO: API should be clearer. I get confused by what is what.
   // If the returned usize is 0, then the packet should not be processed.
   // It's either a duplicate or it is assumed to be dropped.
   std::tuple<usize, DeliveryStatuses, u32> process_read(byte_span buffer) {

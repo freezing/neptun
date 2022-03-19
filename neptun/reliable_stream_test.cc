@@ -10,6 +10,8 @@
 #include "network/io_buffer.h"
 #include "neptun/reliable_stream.h"
 
+#include "common/testing.h"
+
 using namespace freezing;
 using namespace freezing::network;
 
@@ -28,6 +30,8 @@ std::string string_of_span(byte_span span) {
   }
   return s;
 }
+
+const auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
 
 }
 
@@ -109,7 +113,7 @@ TEST(ReliableStreamTest, WriteThenReadMessage) {
   ASSERT_GT(write_count, 0);
 
   usize msg_count = 0;
-  usize read_count = server_stream.read(kPacketId, buffer, [&msg_count](byte_span payload) {
+  usize read_count = *server_stream.read(kPacketId, buffer, [&msg_count](byte_span payload) {
     msg_count++;
     ASSERT_EQ(string_of_span(payload), "foo is test for bar");
   });
@@ -152,7 +156,7 @@ TEST(ReliableStreamTest, PacketDeliveryStatus) {
 
   usize msg_count = 0;
   usize read_count =
-      server_stream.read(kPacketId, successful_packet_buffer, [&msg_count](byte_span payload) {
+      *server_stream.read(kPacketId, successful_packet_buffer, [&msg_count](byte_span payload) {
         msg_count++;
         ASSERT_EQ(string_of_span(payload), "foo is test for bar");
       });
@@ -195,7 +199,7 @@ TEST(ReliableStreamTest, WritesMultipleMessagesPerPacketEachTime) {
   ASSERT_GT(write_count, 0);
 
   usize msg_count = 0;
-  usize read_count = server_stream.read(kPacketId, buffer, [&msg_count](byte_span payload) {
+  usize read_count = *server_stream.read(kPacketId, buffer, [&msg_count](byte_span payload) {
     ASSERT_EQ(string_of_span(payload), "foo is test for bar " + std::to_string(msg_count));
     msg_count++;
   });
@@ -239,6 +243,29 @@ TEST(ReliableStreamTest, ReadsDuplicateMessageOnlyOnce) {
   ASSERT_EQ(msg_count, 1);
 }
 
-TEST(ReliableStreamTest, SendMaliciousPacket) {
-  FAIL();
+TEST(ReliableStreamTest, SendMaliciousPacket_RandomBytes) {
+  auto buffer = make_buffer();
+  for (usize i = 0; i < buffer.size(); i++) {
+    buffer[i] = i * 13 % 79;
+  }
+
+  ReliableStream stream{};
+  Segment::write(buffer, ManagerType::RELIABLE_STREAM, 1);
+  auto result = stream.read(kPacketId, buffer, unexpected_reliable_msgs);
+  // TODO: This can be put behind a nice matcher and provide good messages for debugging.
+  ASSERT_FALSE(result.has_value());
+  ASSERT_EQ(result, make_error(NeptunError::MALFORMED_PACKET));
 }
+
+TEST(ReliableStreamTest, SendMaliciousPacket_InvalidMsgCount) {
+  auto buffer = make_buffer();
+  ReliableStream stream{};
+  Segment::write(buffer, ManagerType::RELIABLE_STREAM, 255);
+  auto result = stream.read(kPacketId, buffer, unexpected_reliable_msgs);
+  // TODO: This can be put behind a nice matcher and provide good messages for debugging.
+  ASSERT_FALSE(result.has_value());
+  ASSERT_EQ(result, make_error(NeptunError::MALFORMED_PACKET));
+}
+
+// TODO: Write proper tests for many cases where packet can be malformed.
+// How to solve this problem systematically so that I don't need to think about all possible hacks?

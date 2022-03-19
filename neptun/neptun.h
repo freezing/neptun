@@ -31,12 +31,15 @@ struct Peer {
 template<typename Network>
 class Neptun {
 public:
-  explicit Neptun(Network &network, IpAddress ip, u32 packet_timeout = detail::kDefaultPacketTimeSeconds) : m_udp_socket{
-      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu), m_packet_timeout{packet_timeout} {}
+  explicit Neptun(Network &network,
+                  IpAddress ip,
+                  u32 packet_timeout = detail::kDefaultPacketTimeSeconds) : m_udp_socket{
+      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu), m_packet_timeout{
+      packet_timeout} {}
 
   template<typename OnReliableFn>
   void tick(u64 now, OnReliableFn on_reliable) {
-    for (auto& [ip, peer] : m_peers) {
+    for (auto&[ip, peer] : m_peers) {
       auto delivery_statuses = peer.packet_delivery_manager.drop_old_packets(now);
       process_delivery_statuses(peer, delivery_statuses);
     }
@@ -46,7 +49,8 @@ public:
 
   template<typename WriteToBufferFn>
   void send_reliable_to(IpAddress ip, WriteToBufferFn write_to_buffer) {
-    auto &reliable_stream = find_or_create_peer(0 /* next_expected_packet_id */, ip).reliable_stream;
+    auto
+        &reliable_stream = find_or_create_peer(0 /* next_expected_packet_id */, ip).reliable_stream;
     reliable_stream.template send(write_to_buffer);
   }
 
@@ -63,7 +67,8 @@ private:
     if (!m_peers.contains(peer_ip)) {
       PacketDeliveryManager packet_delivery_manager{next_expected_packet_id, m_packet_timeout};
       ReliableStream reliable_stream{};
-      m_peers.insert({peer_ip, Peer{std::move(packet_delivery_manager), std::move(reliable_stream)}});
+      m_peers.insert({peer_ip,
+                      Peer{std::move(packet_delivery_manager), std::move(reliable_stream)}});
     }
     return m_peers.find(peer_ip)->second;
   }
@@ -79,7 +84,8 @@ private:
     auto &peer = find_or_create_peer(0 /* next_expected_packet_id */, packet_info->sender);
 
     // Packet Delivery Manager stage.
-    auto [read_count, delivery_statuses, packet_id] = peer.packet_delivery_manager.process_read(buffer);
+    auto[read_count, delivery_statuses, packet_id] = peer.packet_delivery_manager.process_read(
+        buffer);
     if (read_count == 0) {
       return;
     }
@@ -88,17 +94,26 @@ private:
     process_delivery_statuses(peer, delivery_statuses);
 
     // Reliable Stream stage.
-    read_count = peer.reliable_stream.template read(packet_id, buffer, on_reliable);
-    buffer = advance(buffer, read_count);
+    auto reliable_stream_result = peer.reliable_stream.template read(packet_id, buffer, on_reliable);
+    if (!reliable_stream_result) {
+      // Packet is malformed, ignore the rest of it and drop connection to the peer.
+      // TODO: What does it mean to drop the connection? We can't prevent them from sending
+      // us packets.
+      // For now, we are just logging it.
+      // TODO: Use proper logging.
+      std::cerr << "Malformed packet received from the peer: " << packet_info->sender.to_string()
+                << std::endl;
+    }
+    buffer = advance(buffer, *reliable_stream_result);
   }
 
   void write(u64 now) {
-    for (auto& [ip, peer] : m_peers) {
+    for (auto&[ip, peer] : m_peers) {
       write_to_peer(now, ip, peer);
     }
   }
 
-  void write_to_peer(u64 now, IpAddress ip, Peer& peer) {
+  void write_to_peer(u64 now, IpAddress ip, Peer &peer) {
     byte_span buffer(m_network_buffer);
 
     // Packet Delivery Manager stage.
@@ -118,7 +133,7 @@ private:
     assert(sent_count == payload.size());
   }
 
-  static void process_delivery_statuses(Peer& peer, DeliveryStatuses delivery_statuses) {
+  static void process_delivery_statuses(Peer &peer, DeliveryStatuses delivery_statuses) {
     delivery_statuses.template for_each([&peer](u32 packet_id, PacketDeliveryStatus status) {
       peer.reliable_stream.on_packet_delivery_status(packet_id, status);
     });
