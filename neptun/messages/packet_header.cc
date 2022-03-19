@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "packet.h"
+#include "packet_header.h"
 
 using namespace freezing::network;
 

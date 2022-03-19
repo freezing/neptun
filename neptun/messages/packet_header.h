@@ -2,8 +2,8 @@
 // Created by freezing on 13/03/2022.
 //
 
-#ifndef NEPTUN_NEPTUN_MESSAGES_PACKET_H
-#define NEPTUN_NEPTUN_MESSAGES_PACKET_H
+#ifndef NEPTUN_NEPTUN_MESSAGES_PACKET_HEADER_H
+#define NEPTUN_NEPTUN_MESSAGES_PACKET_HEADER_H
 
 #include "network/io_buffer.h"
 #include "common/types.h"
@@ -47,4 +47,4 @@ private:
 
 }
 
-#endif //NEPTUN_NEPTUN_MESSAGES_PACKET_H
+#endif //NEPTUN_NEPTUN_MESSAGES_PACKET_HEADER_H

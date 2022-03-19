@@ -9,7 +9,7 @@
 #include <tuple>
 #include <queue>
 
-#include "neptun/messages/packet.h"
+#include "neptun/messages/packet_header.h"
 #include "neptun/common.h"
 
 // TODO: Use PacketId instead of u32 for packet id.

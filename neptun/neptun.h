@@ -12,7 +12,7 @@
 #include "common/types.h"
 #include "network/network.h"
 #include "network/udp_socket.h"
-#include "neptun/messages/packet.h"
+#include "neptun/messages/packet_header.h"
 #include "neptun/packet_delivery_manager.h"
 #include "neptun/reliable_stream.h"
 
