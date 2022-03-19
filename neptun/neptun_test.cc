@@ -140,3 +140,7 @@ TEST(NeptunTest, Timeouts) {
   });
   ASSERT_EQ(msg_count, 1);
 }
+
+TEST(NeptunTest, IgnoresPacketsForUnrelatedProtocol) {
+  FAIL();
+}

@@ -126,7 +126,7 @@ public:
                                                  std::span<std::uint8_t> buffer) {
     // https://linux.die.net/man/2/recvfrom
     sockaddr_in sender_ip{};
-    socklen_t sender_ip_length{};
+    socklen_t sender_ip_length = sizeof(struct sockaddr_in);
 
     ssize_t read_bytes = ::recvfrom(fd.value,
                                     static_cast<void *>(buffer.data()),
@@ -135,9 +135,11 @@ public:
                                     (struct sockaddr *) &sender_ip,
                                     &sender_ip_length);
 
-    // TODO: Need to handle WOULDBLOCK error.
+    // TODO: Need to handle WOULDBLOCK error for windows.
 
-    if (read_bytes == -1) {
+    if (read_bytes == -1 && (errno == EWOULDBLOCK)) {
+      return {};
+    } else if (read_bytes == -1) {
       throw std::runtime_error("Failed to read data from the socket: " + std::to_string(fd.value));
     } else if (read_bytes == 0) {
       return {};
@@ -154,11 +156,20 @@ public:
                                   static_cast<const void *>(payload.data()),
                                   payload.size(),
                                   detail::kNoFlags,
-                                  (struct sockaddr *) &ip_address,
-                                  sizeof(ip_address));
+                                  ip_address.as_sockaddr(),
+                                  sizeof(sockaddr_in));
     // When sending a UDP packet, we expect all data to be sent.
     if (sent_bytes != payload.size()) {
-      throw std::runtime_error("Failed to sent bytes to: " + ip_address.to_string());
+      std::string error = "unknown";
+      auto error_code = errno;
+      switch (error_code) {
+      case EWOULDBLOCK:
+        error = "WOULD_BLOCK";
+        break;
+      default:
+        error = "unknown code: " + std::to_string(error_code);
+      }
+      throw std::runtime_error("Failed to sent bytes to: " + ip_address.to_string() + " " + error);
     }
     return static_cast<std::size_t>(sent_bytes);
   }

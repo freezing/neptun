@@ -10,9 +10,21 @@
 #include "neptun/packet_delivery_manager.h"
 #include "neptun/messages/segment.h"
 #include "neptun/messages/reliable_message.h"
+#include "neptun/neptun.h"
 
 using namespace std;
+using namespace freezing;
 using namespace freezing::network;
+
+static std::string span_to_string(std::span<std::uint8_t> data) {
+  std::string s{};
+  for (char c : data) {
+    s += c;
+  }
+  return s;
+}
+
+constexpr u64 kReliableMessageIntervalMs = 1000;
 
 int main(int argc, char **argv) {
   if (argc != 5) {
@@ -22,30 +34,37 @@ int main(int argc, char **argv) {
 
   auto ip = IpAddress::from_ipv4(argv[1], stoi(argv[2]));
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
-  auto udp = UdpSocket<OsNetwork>::bind(ip, OS_NETWORK);
+  Neptun<OsNetwork> neptun{OS_NETWORK, ip};
 
   std::vector<std::uint8_t> buffer(1600);
-
-  std::uint64_t packet_id = 0;
+  u64 time_since_last_reliable_msg_ms = 0;
+  auto previous_tick_time = chrono::system_clock::now();
+  u32 reliable_msg_seq_num = 0;
   while (true) {
-    // Write packet.
     auto now = chrono::system_clock::now();
-    auto timestamp = now.time_since_epoch().count();
-    printf("Timestamp: %ld\n", timestamp);
-    std::string note = "Hey there, I'm a UDP packet #: " + to_string(packet_id);
-    packet_id++;
-    auto written_data = Ping::write(buffer, timestamp, note);
-    auto sent_count = udp.send_to(peer_ip, written_data);
-    auto sent_ping = Ping(written_data);
-    cout << "Send: Ping(timestamp = " << sent_ping.timestamp() << ", note = " << sent_ping.note()
-         << endl;
+    auto elapsed_time = chrono::duration_cast<chrono::milliseconds>(now - previous_tick_time).count();
 
-    // Read packet.
-    auto payload = udp.read(buffer)->payload;
-    auto read_ping = Ping(payload);
-    cout << "Read: Ping(timestamp = " << read_ping.timestamp() << ", note = " << read_ping.note()
-         << endl;
+    // Send one reliable message every second.
+    time_since_last_reliable_msg_ms += elapsed_time;
+    // TODO: Create a concept that ticks given frequency.
+    if (time_since_last_reliable_msg_ms >= kReliableMessageIntervalMs) {
+      std::cout << "Sending reliable message" << std::endl;
+      time_since_last_reliable_msg_ms -= kReliableMessageIntervalMs;
+      neptun.send_reliable_to(peer_ip, [&reliable_msg_seq_num](byte_span buffer) {
+        reliable_msg_seq_num++;
+        IoBuffer io{buffer};
+        auto count = io.write_string("Hey there, I'm a [Reliable Message " + to_string(reliable_msg_seq_num) + "]", 0);
+        return buffer.first(count);
+      });
+    }
 
-    this_thread::sleep_for(chrono::seconds(1));
+    neptun.tick(elapsed_time, [](byte_span buffer) {
+      std::cout << "Read: " << span_to_string(buffer) << std::endl;
+    });
+
+    previous_tick_time = now;
+
+    // Run this loop ~100 times a second.
+    this_thread::sleep_for(chrono::milliseconds(10));
   }
 }
