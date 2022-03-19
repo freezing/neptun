@@ -12,6 +12,8 @@ static const IpAddress kServerIp = IpAddress::from_ipv4("192.168.0.10", 12345);
 static const IpAddress kClientIp = IpAddress::from_ipv4("192.168.0.11", 12345);
 // 2022-03-15 21:18:41 GMT (not relevant, but doesn't hurt to know).
 constexpr u64 kNow = 1647379116;
+
+auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
 }
 
 TEST(NeptunTest, ReadAndWriteSingleReliableMessage) {
@@ -24,10 +26,10 @@ TEST(NeptunTest, ReadAndWriteSingleReliableMessage) {
     auto count = io.write_string("this is test string", 0);
     return buffer.first(count);
   });
-  client.write(kNow);
+  client.tick(kNow, unexpected_reliable_msgs);
 
   usize msg_count = 0;
-  server.read(kNow, [&msg_count](byte_span payload) {
+  server.tick(kNow, [&msg_count](byte_span payload) {
     IoBuffer io{payload};
     ASSERT_EQ(io.read_string(0), "this is test string");
     msg_count++;
@@ -46,10 +48,10 @@ TEST(NeptunTest, ReadAndWriteSingleReliableMessage_DropPackets) {
     return buffer.first(count);
   });
   fake_network.drop_packets(true);
-  client.write(kNow);
+  client.tick(kNow, unexpected_reliable_msgs);
 
   usize reliable_msg_count = 0;
-  server.read(kNow, [&reliable_msg_count](byte_span payload) {
+  server.tick(kNow, [&reliable_msg_count](byte_span payload) {
     reliable_msg_count++;
   });
   // Server never received any packets.
@@ -58,28 +60,28 @@ TEST(NeptunTest, ReadAndWriteSingleReliableMessage_DropPackets) {
   fake_network.drop_packets(false);
   // We don't expect any reliable messages to be sent anymore because the client doesn't know
   // that the packets are dropped.
-  client.write(kNow);
+  client.tick(kNow, unexpected_reliable_msgs);
   reliable_msg_count = 0;
-  server.read(kNow, [&reliable_msg_count](byte_span payload) {
+  server.tick(kNow, [&reliable_msg_count](byte_span payload) {
     reliable_msg_count++;
   });
   ASSERT_EQ(reliable_msg_count, 0);
 
   // Server responds to client with acks, but no reliable messages.
   // The acks tell the client that previously sent reliable messages haven't been delivered.
-  server.write(kNow);
+  server.tick(kNow, unexpected_reliable_msgs);
 
   reliable_msg_count = 0;
-  client.read(kNow, [&reliable_msg_count](byte_span payload) {
+  client.tick(kNow, [&reliable_msg_count](byte_span payload) {
     reliable_msg_count++;
   });
   ASSERT_EQ(reliable_msg_count, 0);
 
   // The client resends the reliable message because it was dropped.
-  client.write(kNow);
+  client.tick(kNow, unexpected_reliable_msgs);
 
   reliable_msg_count = 0;
-  server.read(kNow, [&reliable_msg_count](byte_span payload) {
+  server.tick(kNow, [&reliable_msg_count](byte_span payload) {
     IoBuffer io{payload};
     ASSERT_EQ(io.read_string(0), "this is test string");
     reliable_msg_count++;
@@ -101,13 +103,40 @@ TEST(NeptunTest, ReadAndWriteMultipleReliableMessage) {
       return buffer.first(count);
     });
   }
-  client.write(kNow);
+  client.tick(kNow, unexpected_reliable_msgs);
 
   usize msg_count = 0;
-  server.read(kNow, [&msg_count](byte_span payload) {
+  server.tick(kNow, [&msg_count](byte_span payload) {
     IoBuffer io{payload};
     ASSERT_EQ(io.read_string(0), "this is test string " + std::to_string(msg_count));
     msg_count++;
   });
   ASSERT_EQ(msg_count, 10);
+}
+
+TEST(NeptunTest, Timeouts) {
+  constexpr u32 kPacketTimeoutSeconds = 5;
+
+  FakeNetwork fake_network{};
+  Neptun server{fake_network, kServerIp};
+  Neptun client{fake_network, kClientIp, kPacketTimeoutSeconds};
+
+  client.send_reliable_to(kServerIp, [](byte_span buffer) {
+    IoBuffer io{buffer};
+    auto count = io.write_string("this is test string", 0);
+    return buffer.first(count);
+  });
+  fake_network.drop_packets(true);
+  client.tick(kNow, unexpected_reliable_msgs);
+  server.tick(kNow, unexpected_reliable_msgs);
+
+  fake_network.drop_packets(false);
+  client.tick(kNow + 6, unexpected_reliable_msgs);
+  usize msg_count = 0;
+  server.tick(kNow, [&msg_count](byte_span payload) {
+    IoBuffer io{payload};
+    ASSERT_EQ(io.read_string(0), "this is test string");
+    msg_count++;
+  });
+  ASSERT_EQ(msg_count, 1);
 }

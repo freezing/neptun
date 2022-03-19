@@ -84,8 +84,10 @@ TEST(ReliableStreamTest, SentMessageIsWrittenToPacket) {
   ASSERT_EQ(segment.manager_type(), ManagerType::RELIABLE_STREAM);
   ASSERT_EQ(segment.message_count(), 1);
   auto io = IoBuffer{buffer};
-  ASSERT_EQ(io.read_u16(Segment::kSerializedSize), strlen("foo is test for bar"));
-  ASSERT_EQ(string_of_span(io.read_byte_array(Segment::kSerializedSize + sizeof(u16),
+  // TODO: Extract into ReliableMessage.
+  ASSERT_EQ(io.read_u32(Segment::kSerializedSize), 0);
+  ASSERT_EQ(io.read_u16(Segment::kSerializedSize + sizeof(u32)), strlen("foo is test for bar"));
+  ASSERT_EQ(string_of_span(io.read_byte_array(Segment::kSerializedSize + sizeof(u32) + sizeof(u16),
                                               strlen("foo is test for bar"))),
             "foo is test for bar");
 }
@@ -183,7 +185,8 @@ TEST(ReliableStreamTest, WritesMultipleMessagesPerPacketEachTime) {
   // Each message is [strlen("foo is test for bar X")] long, with a [sizeof(u16)] overhead that
   // ReliableStream adds.
   constexpr usize kMaxNumMessagesPerPacket = 6;
-  const usize kMessageSize = (sizeof(u16) + strlen("foo is test for bar X"));
+  // TODO: Use ReliableMessage::SerializedSize
+  const usize kMessageSize = (sizeof(u32)  + sizeof(u16) + strlen("foo is test for bar X"));
   auto buffer =
       make_buffer(Segment::kSerializedSize
                       + kMaxNumMessagesPerPacket * kMessageSize);

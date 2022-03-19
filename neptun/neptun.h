@@ -31,8 +31,42 @@ struct Peer {
 template<typename Network>
 class Neptun {
 public:
-  explicit Neptun(Network &network, IpAddress ip) : m_udp_socket{
-      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu) {}
+  explicit Neptun(Network &network, IpAddress ip, u32 packet_timeout = detail::kDefaultPacketTimeSeconds) : m_udp_socket{
+      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu), m_packet_timeout{packet_timeout} {}
+
+  template<typename OnReliableFn>
+  void tick(u64 now, OnReliableFn on_reliable) {
+    for (auto& [ip, peer] : m_peers) {
+      auto delivery_statuses = peer.packet_delivery_manager.drop_old_packets(now);
+      process_delivery_statuses(peer, delivery_statuses);
+    }
+    read(now, on_reliable);
+    write(now);
+  }
+
+  template<typename WriteToBufferFn>
+  void send_reliable_to(IpAddress ip, WriteToBufferFn write_to_buffer) {
+    auto &reliable_stream = find_or_create_peer(0 /* next_expected_packet_id */, ip).reliable_stream;
+    reliable_stream.template send(write_to_buffer);
+  }
+
+private:
+  // These can be organized into a single network handler (but i need a good name).
+  // e.g. std::map<IpAddress, SingleClientHandler> handlers, where SingleClientHandler has
+  // DeliveryStatusNotification, ReliableStream, etc.
+  std::map<IpAddress, Peer> m_peers;
+  UdpSocket<Network> m_udp_socket;
+  std::vector<u8> m_network_buffer{};
+  u32 m_packet_timeout;
+
+  Peer &find_or_create_peer(u32 next_expected_packet_id, IpAddress peer_ip) {
+    if (!m_peers.contains(peer_ip)) {
+      PacketDeliveryManager packet_delivery_manager{next_expected_packet_id, m_packet_timeout};
+      ReliableStream reliable_stream{};
+      m_peers.insert({peer_ip, Peer{std::move(packet_delivery_manager), std::move(reliable_stream)}});
+    }
+    return m_peers.find(peer_ip)->second;
+  }
 
   template<typename OnReliableFn>
   void read(u64 now, OnReliableFn on_reliable) {
@@ -62,29 +96,6 @@ public:
     for (auto& [ip, peer] : m_peers) {
       write_to_peer(now, ip, peer);
     }
-  }
-
-  template<typename WriteToBufferFn>
-  void send_reliable_to(IpAddress ip, WriteToBufferFn write_to_buffer) {
-    auto &reliable_stream = find_or_create_peer(0 /* next_expected_packet_id */, ip).reliable_stream;
-    reliable_stream.template send(write_to_buffer);
-  }
-
-private:
-  // These can be organized into a single network handler (but i need a good name).
-  // e.g. std::map<IpAddress, SingleClientHandler> handlers, where SingleClientHandler has
-  // DeliveryStatusNotification, ReliableStream, etc.
-  std::map<IpAddress, Peer> m_peers;
-  UdpSocket<Network> m_udp_socket;
-  std::vector<u8> m_network_buffer{};
-
-  Peer &find_or_create_peer(u32 next_expected_packet_id, IpAddress peer_ip) {
-    if (!m_peers.contains(peer_ip)) {
-      PacketDeliveryManager packet_delivery_manager{next_expected_packet_id};
-      ReliableStream reliable_stream{};
-      m_peers.insert({peer_ip, Peer{std::move(packet_delivery_manager), std::move(reliable_stream)}});
-    }
-    return m_peers.find(peer_ip)->second;
   }
 
   void write_to_peer(u64 now, IpAddress ip, Peer& peer) {

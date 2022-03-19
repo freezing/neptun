@@ -33,9 +33,14 @@ struct BufferRange {
   }
 };
 
+struct PendingMessage {
+  BufferRange range;
+  u32 sequence_number;
+};
+
 struct InFlightMessage {
   u32 packet_id;
-  BufferRange range;
+  PendingMessage message;
 };
 
 class ReliableStream {
@@ -52,9 +57,9 @@ public:
       break;
     case PacketDeliveryStatus::DROP:assert(
           in_flight_messages.empty() || in_flight_messages.front().packet_id >= packet_id);
-      std::stack<BufferRange> reversed_messages;
+      std::stack<PendingMessage> reversed_messages;
       while (!in_flight_messages.empty() && in_flight_messages.front().packet_id == packet_id) {
-        reversed_messages.push(in_flight_messages.front().range);
+        reversed_messages.push(in_flight_messages.front().message);
         in_flight_messages.pop();
       }
       while (!reversed_messages.empty()) {
@@ -79,15 +84,23 @@ public:
     usize idx = Segment::kSerializedSize;
     for (int i = 0; i < segment.message_count(); i++) {
       auto io = IoBuffer{buffer};
-      usize length = io.read_u16(idx);
-      if (length + sizeof(u16) > buffer.size()) {
+      // TODO: Read ReliableMessage.
+      u32 sequence_number = io.read_u32(idx);
+      usize length = io.read_u16(idx + sizeof(u32));
+      if (sizeof(u32) + length + sizeof(u16) > buffer.size()) {
         // A bad packet. Report an error instead of logging.
         std::cout << "Bad packet: " << packet_id << std::endl;
         break;
       }
-      auto byte_array = io.read_byte_array(idx + sizeof(u16), length);
-      idx += sizeof(u16) + length;
-      callback(byte_array);
+      auto byte_array = io.read_byte_array(idx + sizeof(u32) + sizeof(u16), length);
+      idx += sizeof(u32) + sizeof(u16) + length;
+
+      // It's important that we process all messages so that the buffer pointer is updated
+      // correctly.
+      if (sequence_number == m_next_expected_sequence_number) {
+        m_next_expected_sequence_number++;
+        callback(byte_array);
+      }
     }
     return idx;
   }
@@ -96,9 +109,10 @@ public:
     // Figure out how many messages can we write.
     usize total_size = Segment::kSerializedSize;
     usize message_count = 0;
-    for (auto buffer_range : pending_messages) {
-      auto msg_span = buffer_span(buffer_range);
-      usize msg_size = sizeof(u16) + msg_span.size();
+    for (auto pending_msg : pending_messages) {
+      auto msg_span = buffer_span(pending_msg.range);
+      // TODO: Get serialized size for ReliableMessage.
+      usize msg_size = sizeof(u32) + sizeof(u16) + msg_span.size();
       if (total_size + msg_size > buffer.size()) {
         break;
       }
@@ -116,16 +130,18 @@ public:
     usize idx = segment.size();
     auto io = IoBuffer{buffer};
     for (usize i = 0; i < message_count; i++) {
-      auto buffer_range = pending_messages.front();
-      auto payload = buffer_span(buffer_range);
+      auto pending_msg = pending_messages.front();
+      auto payload = buffer_span(pending_msg.range);
       pending_messages.pop_front();
-      in_flight_messages.push({packet_id, buffer_range});
+      in_flight_messages.push({packet_id, pending_msg.range});
 
-      usize total_message_size = payload.size() + sizeof(u16);
+      usize total_message_size = sizeof(u32) + payload.size() + sizeof(u16);
       assert(total_message_size <= buffer.size());
 
-      io.write_u16(payload.size(), idx);
-      io.write_byte_array(payload, idx + sizeof(u16));
+      // TODO: Extract this into ReliableMessage.
+      io.write_u32(pending_msg.sequence_number, idx);
+      io.write_u16(payload.size(), idx + sizeof(u32));
+      io.write_byte_array(payload, idx + sizeof(u32) + sizeof(u16));
       idx += total_message_size;
     }
     assert(idx == total_size);
@@ -138,7 +154,8 @@ public:
     // TODO: It's a nicer API for the user if [write_to_buffer] returns [usize].
     auto payload = write_to_buffer(m_buffer.remaining());
     if (!payload.empty()) {
-      pending_messages.push_back({m_buffer.end_index(), m_buffer.end_index() + payload.size()});
+      auto sequence_number = m_next_outgoing_sequence_number++;
+      pending_messages.push_back({m_buffer.end_index(), m_buffer.end_index() + payload.size(), sequence_number});
       m_buffer.advance(payload.size());
     }
   }
@@ -146,7 +163,9 @@ public:
 private:
   FlipBuffer<u8> m_buffer;
   std::queue<InFlightMessage> in_flight_messages;
-  std::deque<BufferRange> pending_messages;
+  std::deque<PendingMessage> pending_messages;
+  u32 m_next_outgoing_sequence_number{0};
+  u32 m_next_expected_sequence_number{0};
 
   byte_span buffer_span(BufferRange range) {
     return {m_buffer.begin() + range.begin, m_buffer.begin() + range.end};
@@ -159,13 +178,13 @@ private:
       // Repeat that queue.size() times, and we have effectively iterated over the elements in the
       // queue.
       for (usize i = 0; i < in_flight_messages.size(); i++) {
-        auto msg = in_flight_messages.front();
-        msg.range -= m_buffer.begin_index();
-        in_flight_messages.push(msg);
+        auto in_flight_msg = in_flight_messages.front();
+        in_flight_msg.message.range -= m_buffer.begin_index();
+        in_flight_messages.push(in_flight_msg);
       }
 
-      for (auto& range : pending_messages) {
-        range -= m_buffer.begin_index();
+      for (auto& pending_msg : pending_messages) {
+        pending_msg.range -= m_buffer.begin_index();
       }
 
       m_buffer.flip();
