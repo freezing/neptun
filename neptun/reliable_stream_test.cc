@@ -267,5 +267,12 @@ TEST(ReliableStreamTest, SendMaliciousPacket_InvalidMsgCount) {
   ASSERT_EQ(result, make_error(NeptunError::MALFORMED_PACKET));
 }
 
+TEST(ReliableStreamTest, GapOfReliableMessages) {
+  // Write a test that sends some reliable messages, then doesn't send any for a couple of packets,
+  // then send it again.
+  // Ensure some packets that don't have the reliable message are dropped.
+  FAIL();
+}
+
 // TODO: Write proper tests for many cases where packet can be malformed.
 // How to solve this problem systematically so that I don't need to think about all possible hacks?

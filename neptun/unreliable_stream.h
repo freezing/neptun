@@ -71,7 +71,7 @@ public:
     for (usize i = 0; i < message_count; i++) {
       auto payload = m_pending_messages.front();
       m_pending_messages.pop_front();
-      m_buffer.advance(payload.size());
+      m_buffer.consume(payload.size());
       auto unreliable_message_buffer = UnreliableMessage::write(advance(buffer, idx),
                                                                 payload.size(),
                                                                 payload);
@@ -80,7 +80,9 @@ public:
       idx += total_message_size;
     }
     assert(idx == total_size);
+    // Drop all pending messages if we couldn't send them in one packet.
     m_buffer.flip();
+    m_pending_messages.clear();
     return total_size;
   }
 

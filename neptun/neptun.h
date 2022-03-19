@@ -20,7 +20,10 @@
 namespace freezing::network {
 
 namespace {
-constexpr usize kBigEnoughForMtu = 1600;
+// Just above is used for reading.
+constexpr usize kJustAboveMtu = 1600;
+// JKust below is used for writing.
+constexpr usize kJustBelowMtu = 1400;
 
 struct Peer {
   PacketDeliveryManager packet_delivery_manager;
@@ -36,7 +39,7 @@ public:
   explicit Neptun(Network &network,
                   IpAddress ip,
                   u32 packet_timeout = detail::kDefaultPacketTimeSeconds) : m_udp_socket{
-      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu), m_packet_timeout{
+      UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kJustAboveMtu), m_packet_timeout{
       packet_timeout} {}
 
   template<typename OnReliableFn = std::function<void(byte_span)>, typename OnUnreliableFn = std::function<
@@ -91,7 +94,8 @@ private:
   void read(u64 now,
             OnReliableFn on_reliable,
             OnUnreliableFn on_unreliable = [](byte_span payload) {}) {
-    std::optional<ReadPacketInfo> packet_info = m_udp_socket.read(m_network_buffer);
+    byte_span network_buffer(m_network_buffer.begin(), m_network_buffer.begin() + kJustAboveMtu);
+    std::optional<ReadPacketInfo> packet_info = m_udp_socket.read(network_buffer);
     if (!packet_info) {
       // There are no packets in the stream.
       return;
@@ -144,7 +148,7 @@ private:
   }
 
   void write_to_peer(u64 now, IpAddress ip, Peer &peer) {
-    byte_span buffer(m_network_buffer);
+    byte_span buffer(m_network_buffer.begin(), m_network_buffer.begin() + kJustBelowMtu);
 
     // Packet Delivery Manager stage.
     auto packet_header_count = peer.packet_delivery_manager.write(buffer, now);

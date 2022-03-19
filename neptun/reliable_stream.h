@@ -66,10 +66,10 @@ public:
       }
       assert(in_flight_messages.empty() || in_flight_messages.front().packet_id > packet_id);
       break;
-    case PacketDeliveryStatus::DROP:assert(
-          in_flight_messages.empty() || in_flight_messages.front().packet_id == packet_id);
+    case PacketDeliveryStatus::DROP:
+      assert(in_flight_messages.empty() || in_flight_messages.front().packet_id >= packet_id);
       std::stack<PendingMessage> reversed_messages;
-      while (!in_flight_messages.empty() && in_flight_messages.front().packet_id >= packet_id) {
+      while (!in_flight_messages.empty()) {
         reversed_messages.push(in_flight_messages.front().message);
         in_flight_messages.pop();
       }

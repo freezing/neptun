@@ -52,7 +52,7 @@ public:
   }
 
   void advance(usize count) {
-    assert(m_end + count < m_buffer.capacity());
+    assert(m_end + count <= m_buffer.capacity());
     m_end += count;
   }
 

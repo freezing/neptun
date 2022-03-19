@@ -17,6 +17,7 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using usize = std::size_t;
 using byte_span = std::span<u8>;
+// TODO: Introduce [time_ns] to avoid precision bugs.
 
 inline byte_span advance(byte_span span, usize count) {
   return span.last(span.size() - count);
