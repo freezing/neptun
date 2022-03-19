@@ -51,9 +51,9 @@ int main(int argc, char **argv) {
       std::cout << "Sending reliable message to " << peer_ip.to_string() << std::endl;
       time_since_last_reliable_msg_ms -= kReliableMessageIntervalMs;
       neptun.send_reliable_to(peer_ip, [&reliable_msg_seq_num](byte_span buffer) {
-        reliable_msg_seq_num++;
         IoBuffer io{buffer};
         auto count = io.write_string("Hey there, I'm a [Reliable Message " + to_string(reliable_msg_seq_num) + "]", 0);
+        reliable_msg_seq_num++;
         return buffer.first(count);
       });
     }
