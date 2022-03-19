@@ -24,7 +24,7 @@ static std::string span_to_string(std::span<std::uint8_t> data) {
   return s;
 }
 
-constexpr u64 kReliableMessageIntervalMs = 1000;
+constexpr u64 kReliableMessageIntervalMs = 100;
 
 int main(int argc, char **argv) {
   if (argc != 5) {

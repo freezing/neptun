@@ -33,6 +33,11 @@ struct BufferRange {
     end -= value;
     return *this;
   }
+
+  usize size() const {
+    assert(begin <= end);
+    return end - begin;
+  }
 };
 
 struct PendingMessage {
@@ -56,15 +61,14 @@ public:
     switch (status) {
     case PacketDeliveryStatus::ACK:
       while (!in_flight_messages.empty() && in_flight_messages.front().packet_id == packet_id) {
+        m_buffer.consume(in_flight_messages.front().message.range.size());
         in_flight_messages.pop();
       }
       assert(in_flight_messages.empty() || in_flight_messages.front().packet_id > packet_id);
       break;
     case PacketDeliveryStatus::DROP:assert(
-          in_flight_messages.empty() || in_flight_messages.front().packet_id >= packet_id);
+          in_flight_messages.empty() || in_flight_messages.front().packet_id == packet_id);
       std::stack<PendingMessage> reversed_messages;
-      // TODO: Very inefficient. We drop all in-flight messages sent after the one that is dropped.
-      //  We can be smarted and only retry the ones that are dropped.
       while (!in_flight_messages.empty() && in_flight_messages.front().packet_id >= packet_id) {
         reversed_messages.push(in_flight_messages.front().message);
         in_flight_messages.pop();
