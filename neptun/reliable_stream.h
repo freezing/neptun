@@ -84,6 +84,8 @@ public:
     }
     usize idx = Segment::kSerializedSize;
     for (int i = 0; i < segment.message_count(); i++) {
+      // TODO: Advance buffer and then [buffer.size() - idx] is ugly. Refactor.
+      // The same in other places.
       ReliableMessage reliable_message(advance(buffer, idx));
       const auto msg_size = reliable_message.serialized_size();
       if (msg_size > buffer.size() - idx) {
