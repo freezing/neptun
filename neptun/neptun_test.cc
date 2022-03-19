@@ -183,6 +183,34 @@ TEST(NeptunTest, ReliableMessageAfterDroppingMultiplePackets) {
   ASSERT_EQ(msg_count, 6);
 }
 
+TEST(NeptunTest, UnreliableMessage) {
+  FakeNetwork fake_network{};
+  Neptun server{fake_network, kServerIp};
+  Neptun client{fake_network, kClientIp};
+
+  client.send_unreliable_to(kServerIp, [](byte_span buffer) {
+    IoBuffer io{buffer};
+    auto count = io.write_string("unreliable value", 0);
+    return buffer.first(count);
+  });
+
+  client.tick(kNow);
+
+  usize msg_count = 0;
+  server.tick(kNow, unexpected_reliable_msgs, [&msg_count] (byte_span buffer) {
+    IoBuffer io{buffer};
+    ASSERT_EQ(io.read_string(0), "unreliable value");
+    msg_count++;
+  });
+  ASSERT_EQ(msg_count, 1);
+}
+
 TEST(NeptunTest, IgnoresPacketsForUnrelatedProtocol) {
+  FAIL();
+}
+
+TEST(NeptunTest, PacketChecksum) {
+  // Packet bits may be flipped because UDP only provides 16-bit checksums.
+  // Rollout custom checksum and drop corrupt packets.
   FAIL();
 }

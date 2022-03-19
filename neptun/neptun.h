@@ -15,6 +15,7 @@
 #include "neptun/messages/packet_header.h"
 #include "neptun/packet_delivery_manager.h"
 #include "neptun/reliable_stream.h"
+#include "neptun/unreliable_stream.h"
 
 namespace freezing::network {
 
@@ -24,6 +25,7 @@ constexpr usize kBigEnoughForMtu = 1600;
 struct Peer {
   PacketDeliveryManager packet_delivery_manager;
   ReliableStream reliable_stream;
+  UnreliableStream unreliable_stream;
 };
 
 }
@@ -37,13 +39,16 @@ public:
       UdpSocket<Network>::bind(ip, network)}, m_network_buffer(kBigEnoughForMtu), m_packet_timeout{
       packet_timeout} {}
 
-  template<typename OnReliableFn>
-  void tick(u64 now, OnReliableFn on_reliable) {
+  template<typename OnReliableFn = std::function<void(byte_span)>, typename OnUnreliableFn = std::function<
+      void(byte_span)>>
+  void tick(u64 now,
+            OnReliableFn on_reliable = [](byte_span) {},
+            OnUnreliableFn on_unreliable = [](byte_span) {}) {
     for (auto&[ip, peer] : m_peers) {
       auto delivery_statuses = peer.packet_delivery_manager.drop_old_packets(now);
       process_delivery_statuses(peer, delivery_statuses);
     }
-    read(now, on_reliable);
+    read(now, on_reliable, on_unreliable);
     write(now);
   }
 
@@ -52,6 +57,13 @@ public:
     auto
         &reliable_stream = find_or_create_peer(0 /* next_expected_packet_id */, ip).reliable_stream;
     reliable_stream.template send(write_to_buffer);
+  }
+
+  template<typename WriteToBufferFn>
+  void send_unreliable_to(IpAddress ip, WriteToBufferFn write_to_buffer) {
+    auto &unreliable_stream =
+        find_or_create_peer(0 /* next_expected_packet_id */, ip).unreliable_stream;
+    unreliable_stream.template send(write_to_buffer);
   }
 
 private:
@@ -67,14 +79,18 @@ private:
     if (!m_peers.contains(peer_ip)) {
       PacketDeliveryManager packet_delivery_manager{next_expected_packet_id, m_packet_timeout};
       ReliableStream reliable_stream{};
+      UnreliableStream unreliable_stream{};
       m_peers.insert({peer_ip,
-                      Peer{std::move(packet_delivery_manager), std::move(reliable_stream)}});
+                      Peer{std::move(packet_delivery_manager), std::move(reliable_stream),
+                           std::move(unreliable_stream)}});
     }
     return m_peers.find(peer_ip)->second;
   }
 
-  template<typename OnReliableFn>
-  void read(u64 now, OnReliableFn on_reliable) {
+  template<typename OnReliableFn, typename OnUnreliableFn>
+  void read(u64 now,
+            OnReliableFn on_reliable,
+            OnUnreliableFn on_unreliable = [](byte_span payload) {}) {
     std::optional<ReadPacketInfo> packet_info = m_udp_socket.read(m_network_buffer);
     if (!packet_info) {
       // There are no packets in the stream.
@@ -94,7 +110,8 @@ private:
     process_delivery_statuses(peer, delivery_statuses);
 
     // Reliable Stream stage.
-    auto reliable_stream_result = peer.reliable_stream.template read(packet_id, buffer, on_reliable);
+    auto
+        reliable_stream_result = peer.reliable_stream.template read(packet_id, buffer, on_reliable);
     if (!reliable_stream_result) {
       // Packet is malformed, ignore the rest of it and drop connection to the peer.
       // TODO: What does it mean to drop the connection? We can't prevent them from sending
@@ -103,8 +120,21 @@ private:
       // TODO: Use proper logging.
       std::cerr << "Malformed packet received from the peer: " << packet_info->sender.to_string()
                 << std::endl;
+      // Ignore the rest of the data.
+      return;
     }
     buffer = advance(buffer, *reliable_stream_result);
+
+    // Unreliable Stream stage.
+    auto unreliable_stream_result =
+        peer.unreliable_stream.template read(buffer, on_unreliable);
+    if (!unreliable_stream_result) {
+      std::cerr << "Malformed packet received from the peer: " << packet_info->sender.to_string()
+                << std::endl;
+      // Ignore the rest of the data.
+      return;
+    }
+    buffer = advance(buffer, *unreliable_stream_result);
   }
 
   void write(u64 now) {
@@ -114,7 +144,7 @@ private:
   }
 
   void write_to_peer(u64 now, IpAddress ip, Peer &peer) {
-     byte_span buffer(m_network_buffer);
+    byte_span buffer(m_network_buffer);
 
     // Packet Delivery Manager stage.
     auto packet_header_count = peer.packet_delivery_manager.write(buffer, now);
@@ -126,9 +156,13 @@ private:
     auto reliable_stream_count = peer.reliable_stream.write(packet_header.id(), buffer);
     buffer = advance(buffer, reliable_stream_count);
 
+    // Unreliable Stream stage.
+    auto unreliable_stream_count = peer.unreliable_stream.write(buffer);
+    buffer = advance(buffer, unreliable_stream_count);
+
     // Send to the peer. For many peers, we can buffer all packets and send them in one go with
     // "send to many" syscall (at least on Linux).
-    byte_span payload(m_network_buffer.data(), packet_header_count + reliable_stream_count);
+    byte_span payload(m_network_buffer.data(), packet_header_count + reliable_stream_count + unreliable_stream_count);
     auto sent_count = m_udp_socket.send_to(ip, payload);
     assert(sent_count == payload.size());
   }

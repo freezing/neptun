@@ -164,7 +164,7 @@ public:
 
   template<typename WriteToBufferFn>
   void send(WriteToBufferFn write_to_buffer) {
-    flip();
+    maybe_flip();
     // TODO: It's a nicer API for the user if [write_to_buffer] returns [usize].
     auto payload = write_to_buffer(m_buffer.remaining());
     if (!payload.empty()) {
@@ -186,7 +186,7 @@ private:
     return {m_buffer.begin() + range.begin, m_buffer.begin() + range.end};
   }
 
-  void flip() {
+  void maybe_flip() {
     if (m_buffer.begin_index() > 0) {
       // A "creative" solution:
       // Pop each element from the queue and put it back.
