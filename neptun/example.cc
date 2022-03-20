@@ -66,13 +66,14 @@ int main(int argc, char **argv) {
 
   Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(0));
   Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
-  Ticker print_metrics_ticker(chrono::system_clock::now(), chrono::seconds(10));
+  Ticker print_metrics_ticker(chrono::system_clock::now(), chrono::seconds(5));
 
   std::vector<std::uint8_t> buffer(1600);
   u32 reliable_msg_seq_num = 0;
   u32 unreliable_msg_seq_num = 0;
   usize chars_read = 0;
-  NeptunMetrics last_metrics{"Rate"};
+  NeptunMetrics last_metrics{"Neptun Rate"};
+  NetworkMetrics last_network_metrics{"Network Rate"};
   std::chrono::sys_time<std::chrono::nanoseconds> last_print_metrics_time{};
   while (true) {
     auto now = chrono::system_clock::now();
@@ -118,20 +119,30 @@ int main(int argc, char **argv) {
 
     if (print_metrics_ticker.tick(now)) {
       // Print total
-      std::cout << neptun.metrics() << std::endl;
+//      std::cout << neptun.metrics() << std::endl;
 
-      // Print rate
-      Metrics<NeptunMetricKey, double> rate{"Neptun Rate /s"};
-      foreach_key<NeptunMetricKey>([&rate, &neptun, last_metrics, last_print_metrics_time, now](
+      // Print rate neptun
+      Metrics<NeptunMetricKey, double> neptun_rate{"Neptun Rate /s"};
+      foreach_key<NeptunMetricKey>([&neptun_rate, &neptun, last_metrics, last_print_metrics_time, now](
           NeptunMetricKey key) {
         double delta = neptun.metrics().value(key) - last_metrics.value(key);
         double seconds =
             std::chrono::duration_cast<std::chrono::seconds>(now - last_print_metrics_time).count();
-        rate.inc(key, delta / seconds);
+        neptun_rate.inc(key, delta / seconds);
       });
-      std::cout << rate << std::endl << std::endl;
+      // Print rate network
+      Metrics<NetworkMetricKey, double> network_rate{"Network Rate /s"};
+      foreach_key<NetworkMetricKey>([&network_rate, last_network_metrics, last_print_metrics_time, now](
+          NetworkMetricKey key) {
+        double delta = OS_NETWORK_METRICS.value(key) - last_network_metrics.value(key);
+        double seconds =
+            std::chrono::duration_cast<std::chrono::seconds>(now - last_print_metrics_time).count();
+        network_rate.inc(key, delta / seconds);
+      });
+      std::cout << neptun_rate << std::endl << network_rate << std::endl;
 
       last_metrics = neptun.metrics();
+      last_network_metrics = OS_NETWORK_METRICS;
       // TODO: Can Ticker provide previous tick time?
       last_print_metrics_time = now;
     }

@@ -10,6 +10,8 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include "common/types.h"
+
 namespace freezing::network {
 
 namespace detail {

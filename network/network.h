@@ -35,6 +35,7 @@
 
 #include "common/types.h"
 #include "network/ip_address.h"
+#include "network/network_metrics.h"
 
 namespace freezing::network {
 
@@ -54,6 +55,8 @@ struct ReadPacketInfo {
   IpAddress sender;
   byte_span payload;
 };
+
+static NetworkMetrics OS_NETWORK_METRICS{"Network Metrics"};
 
 class OsNetwork {
 public:
@@ -144,6 +147,8 @@ public:
     } else if (read_bytes == 0) {
       return {};
     } else {
+      OS_NETWORK_METRICS.inc(NetworkMetricKey::PACKETS_READ);
+      OS_NETWORK_METRICS.inc(NetworkMetricKey::PAYLOAD_INGRESS, read_bytes);
       return {{IpAddress(sender_ip), buffer.subspan(0, read_bytes)}};
     }
   }
@@ -171,6 +176,8 @@ public:
       }
       throw std::runtime_error("Failed to sent bytes to: " + ip_address.to_string() + " " + error);
     }
+    OS_NETWORK_METRICS.inc(NetworkMetricKey::PACKETS_SENT);
+    OS_NETWORK_METRICS.inc(NetworkMetricKey::PAYLOAD_EGRESS, sent_bytes);
     return static_cast<std::size_t>(sent_bytes);
   }
 };

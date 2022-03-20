@@ -107,7 +107,6 @@ private:
       // There are no packets in the stream.
       return;
     }
-    m_metrics.inc(NeptunMetricKey::PACKETS_READ);
     auto buffer = packet_info->payload;
     auto &peer = find_or_create_peer(0 /* next_expected_packet_id */, packet_info->sender);
 
@@ -177,7 +176,6 @@ private:
     byte_span payload(m_network_buffer.data(), packet_header_count + reliable_stream_count + unreliable_stream_count);
     auto sent_count = m_udp_socket.send_to(ip, payload);
     assert(sent_count == payload.size());
-    m_metrics.inc(NeptunMetricKey::PACKETS_SENT);
   }
 
   void process_delivery_statuses(Peer &peer, DeliveryStatuses delivery_statuses) {
