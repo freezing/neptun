@@ -194,6 +194,7 @@ private:
       // queue.
       for (usize i = 0; i < in_flight_messages.size(); i++) {
         auto in_flight_msg = in_flight_messages.front();
+        in_flight_messages.pop();
         in_flight_msg.message.range -= m_buffer.begin_index();
         in_flight_messages.push(in_flight_msg);
       }

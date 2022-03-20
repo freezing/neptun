@@ -61,8 +61,8 @@ int main(int argc, char **argv) {
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
   Neptun<OsNetwork> neptun{OS_NETWORK, ip};
 
-  Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(100));
-  Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(300));
+  Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(10));
+  Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
 
   std::vector<std::uint8_t> buffer(1600);
   u32 reliable_msg_seq_num = 0;
@@ -116,6 +116,6 @@ int main(int argc, char **argv) {
                 print_string);
 
     // Run this loop ~100 times a second.
-    this_thread::sleep_for(chrono::milliseconds(1000));
+    this_thread::sleep_for(chrono::milliseconds(10));
   }
 }
