@@ -57,6 +57,9 @@ int main(int argc, char **argv) {
     return -1;
   }
 
+  constexpr usize kNumReliableMsgsPerBatch = 10;
+  constexpr usize kNumUnreliableMsgsPerBatch = 10;
+
   auto ip = IpAddress::from_ipv4(argv[1], stoi(argv[2]));
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
   Neptun<OsNetwork> neptun{OS_NETWORK, ip};
@@ -71,38 +74,42 @@ int main(int argc, char **argv) {
     auto now = chrono::system_clock::now();
 
     if (reliable_ticker.tick(now)) {
-      neptun.send_reliable_to(peer_ip, [&reliable_msg_seq_num](byte_span buffer) {
-        IoBuffer io{buffer};
-        // TODO: Need io.serialized_size(s).
-        std::string s = "Reliable " + to_string(reliable_msg_seq_num);
+      for (usize i = 0; i < kNumReliableMsgsPerBatch; i++) {
+        neptun.send_reliable_to(peer_ip, [&reliable_msg_seq_num](byte_span buffer) {
+          IoBuffer io{buffer};
+          // TODO: Need io.serialized_size(s).
+          std::string s = "Reliable " + to_string(reliable_msg_seq_num);
 
-        usize serialized_size = sizeof(u16) + s.size();
-        if (serialized_size > buffer.size()) {
-          // Flow control kicking in.
-          std::cout << "Reliable Flow Control kicking in." << std::endl;
-          return byte_span{};
-        }
-        auto count = io.write_string(s, 0);
-        reliable_msg_seq_num++;
-        return buffer.first(count);
-      });
+          usize serialized_size = sizeof(u16) + s.size();
+          if (serialized_size > buffer.size()) {
+            // Flow control kicking in.
+            std::cout << "Reliable Flow Control kicking in." << std::endl;
+            return byte_span{};
+          }
+          auto count = io.write_string(s, 0);
+          reliable_msg_seq_num++;
+          return buffer.first(count);
+        });
+      }
     }
 
     if (unreliable_ticker.tick(now)) {
-      neptun.send_unreliable_to(peer_ip, [&unreliable_msg_seq_num](byte_span buffer) {
-        IoBuffer io{buffer};
-        std::string s = "Unreliable " + to_string(unreliable_msg_seq_num);
+      for (usize i = 0; i < kNumUnreliableMsgsPerBatch; i++) {
+        neptun.send_unreliable_to(peer_ip, [&unreliable_msg_seq_num](byte_span buffer) {
+          IoBuffer io{buffer};
+          std::string s = "Unreliable " + to_string(unreliable_msg_seq_num);
 
-        usize serialized_size = sizeof(u16) + s.size();
-        if (serialized_size > buffer.size()) {
-          // Flow control kicking in.
-          std::cout << "Unreliable buffers are full." << std::endl;
-          return byte_span{};
-        }
-        auto count = io.write_string(s, 0);
-        unreliable_msg_seq_num++;
-        return buffer.first(count);
-      });
+          usize serialized_size = sizeof(u16) + s.size();
+          if (serialized_size > buffer.size()) {
+            // Flow control kicking in.
+            std::cout << "Unreliable buffers are full." << std::endl;
+            return byte_span{};
+          }
+          auto count = io.write_string(s, 0);
+          unreliable_msg_seq_num++;
+          return buffer.first(count);
+        });
+      }
     }
 
     auto print_string = [](byte_span buffer) {
