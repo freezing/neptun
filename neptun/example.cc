@@ -66,10 +66,12 @@ int main(int argc, char **argv) {
 
   Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(0));
   Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
+  Ticker print_metrics_ticker(chrono::system_clock::now(), chrono::seconds(10));
 
   std::vector<std::uint8_t> buffer(1600);
   u32 reliable_msg_seq_num = 0;
   u32 unreliable_msg_seq_num = 0;
+  usize chars_read = 0;
   while (true) {
     auto now = chrono::system_clock::now();
 
@@ -112,10 +114,15 @@ int main(int argc, char **argv) {
       }
     }
 
-    auto print_string = [](byte_span buffer) {
+    if (print_metrics_ticker.tick(now)) {
+      std::cout << neptun.metrics() << std::endl;
+    }
+
+    auto print_string = [&chars_read](byte_span buffer) {
       IoBuffer io{buffer};
       auto s = io.read_string(0);
-      std::cout << s << std::endl;
+//      std::cout << s << std::endl;
+      chars_read += s.size();
     };
 
     neptun.tick(chrono::time_point_cast<chrono::seconds>(now).time_since_epoch().count(),

@@ -16,6 +16,7 @@
 #include "neptun/packet_delivery_manager.h"
 #include "neptun/reliable_stream.h"
 #include "neptun/unreliable_stream.h"
+#include "neptun/neptun_metrics.h"
 
 namespace freezing::network {
 
@@ -69,6 +70,10 @@ public:
     unreliable_stream.template send(write_to_buffer);
   }
 
+  const NeptunMetrics& metrics() const {
+    return m_metrics;
+  }
+
 private:
   // These can be organized into a single network handler (but i need a good name).
   // e.g. std::map<IpAddress, SingleClientHandler> handlers, where SingleClientHandler has
@@ -77,6 +82,8 @@ private:
   UdpSocket<Network> m_udp_socket;
   std::vector<u8> m_network_buffer{};
   u32 m_packet_timeout;
+  NeptunMetrics m_metrics{"Neptun metrics"};
+
 
   Peer &find_or_create_peer(PacketId next_expected_packet_id, IpAddress peer_ip) {
     if (!m_peers.contains(peer_ip)) {
@@ -100,6 +107,7 @@ private:
       // There are no packets in the stream.
       return;
     }
+    m_metrics.inc(NeptunMetricKey::PACKETS_READ);
     auto buffer = packet_info->payload;
     auto &peer = find_or_create_peer(0 /* next_expected_packet_id */, packet_info->sender);
 
@@ -169,11 +177,22 @@ private:
     byte_span payload(m_network_buffer.data(), packet_header_count + reliable_stream_count + unreliable_stream_count);
     auto sent_count = m_udp_socket.send_to(ip, payload);
     assert(sent_count == payload.size());
+    m_metrics.inc(NeptunMetricKey::PACKETS_SENT);
   }
 
-  static void process_delivery_statuses(Peer &peer, DeliveryStatuses delivery_statuses) {
-    delivery_statuses.template for_each([&peer](PacketId packet_id, PacketDeliveryStatus status) {
+  void process_delivery_statuses(Peer &peer, DeliveryStatuses delivery_statuses) {
+    delivery_statuses.template for_each([this, &peer](PacketId packet_id, PacketDeliveryStatus status) {
       peer.reliable_stream.on_packet_delivery_status(packet_id, status);
+      switch (status) {
+      case PacketDeliveryStatus::ACK:
+        m_metrics.inc(NeptunMetricKey::PACKET_ACKS);
+        break;
+      case PacketDeliveryStatus::DROP:
+        m_metrics.inc(NeptunMetricKey::PACKET_DROPS);
+        break;
+      default:
+        throw std::runtime_error("Unknown PacketDeliveryStatus");
+      }
     });
   }
 };
