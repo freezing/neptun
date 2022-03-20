@@ -112,7 +112,7 @@ std::string to_hex(byte_span payload) {
   std::stringstream ss;
   std::string sep{};
   for (auto byte : payload) {
-    ss << sep << std::hex << (int)byte;
+    ss << sep << std::hex << (int) byte;
     sep = " ";
   }
   return ss.str();
@@ -141,7 +141,8 @@ std::string format_neptun_structure(byte_span payload) {
       for (usize idx = 0; idx < msg_count; idx++) {
         auto msg = ReliableMessage(payload);
         payload = advance(payload, msg.serialized_size());
-        ss << "[seq_num=" << msg.sequence_number() << ", length=" << msg.length() << ", payload=" << to_hex(msg.payload()) << "]";
+        ss << "[seq_num=" << msg.sequence_number() << ", length=" << msg.length() << ", payload="
+           << to_hex(msg.payload()) << "]";
       }
     };
 
@@ -154,7 +155,8 @@ std::string format_neptun_structure(byte_span payload) {
     };
 
     // TODO: Group Segment and ReliableMessages into ReliableSegment message.
-    ss << "[" << format_manager_type(segment.manager_type()) << ", msg_count=" << std::to_string(segment.message_count()) << "]";
+    ss << "[" << format_manager_type(segment.manager_type()) << ", msg_count="
+       << std::to_string(segment.message_count()) << "]";
     payload = advance(payload, Segment::kSerializedSize);
 
     switch (segment.manager_type()) {
@@ -208,9 +210,12 @@ void process_record(PcapRecordHeader record_header, byte_span record_payload, us
   // TODO: Neptun packets must have protocol id to identify them.
   // For now, filter by known port for prototyping purposes.
   bool is_neptun_packet = source_ip.port() == 7778 || source_ip.port() == 7779;
-  std::string neptun_structure = is_neptun_packet ? format_neptun_structure(record_payload) : "<not neptun packet>";
-  std::cout << record_index << ": " << time_str << " UDP " << source_ip.to_string() << " > " << destination_ip.to_string()
-            << " length " << udp_header.length << " " << "neptun_payload=" << neptun_structure << std::endl;
+  std::string neptun_structure =
+      is_neptun_packet ? format_neptun_structure(record_payload) : "<not neptun packet>";
+  std::cout << record_index << ": " << time_str << " UDP " << source_ip.to_string() << " > "
+            << destination_ip.to_string()
+            << " length " << udp_header.length << " " << "neptun_payload=" << neptun_structure
+            << std::endl;
 }
 
 void process_pcap_file(std::fstream &file) {
@@ -233,6 +238,9 @@ void process_pcap_file(std::fstream &file) {
 int main(int argc, char **argv) {
   if (argc != 2) {
     std::cout << "Usage: <filename>" << std::endl;
+    std::cout
+        << "To capture UDP packet data run: [sudo tcpdump -i lo udp -w ./test_data/lo-neptun-example.pcap]"
+        << std::endl;
     return -1;
   }
   std::string filename(argv[1]);
