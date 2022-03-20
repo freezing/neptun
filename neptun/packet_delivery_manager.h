@@ -39,11 +39,11 @@ static std::optional<u32> most_significant_bit(u32 value) {
 
 class DeliveryStatuses {
 public:
-  void add_ack(u32 packet_id) {
+  void add_ack(PacketId packet_id) {
     m_statuses.emplace_back(packet_id, PacketDeliveryStatus::ACK);
   }
 
-  void add_drop(u32 packet_id) {
+  void add_drop(PacketId packet_id) {
     m_statuses.emplace_back(packet_id, PacketDeliveryStatus::DROP);
   }
 
@@ -55,19 +55,19 @@ public:
     }
   }
 
-  std::vector<std::pair<u32, PacketDeliveryStatus>> to_vector() const {
+  std::vector<std::pair<PacketId, PacketDeliveryStatus>> to_vector() const {
     return m_statuses;
   }
 
 private:
-  std::vector<std::pair<u32, PacketDeliveryStatus>> m_statuses;
+  std::vector<std::pair<PacketId, PacketDeliveryStatus>> m_statuses;
 
 };
 
 class PacketDeliveryManager {
 public:
   explicit PacketDeliveryManager(
-      u32 next_expected_packet_id,
+      PacketId next_expected_packet_id,
       u32 packet_timeout_seconds = detail::kDefaultPacketTimeSeconds) : m_next_expected_packet_id{
       next_expected_packet_id}, m_packet_timeout_seconds{
       packet_timeout_seconds} {}
@@ -75,7 +75,7 @@ public:
   // TODO: API should be clearer. I get confused by what is what.
   // If the returned usize is 0, then the packet should not be processed.
   // It's either a duplicate or it is assumed to be dropped.
-  std::tuple<usize, DeliveryStatuses, u32> process_read(byte_span buffer) {
+  std::tuple<usize, DeliveryStatuses, PacketId> process_read(byte_span buffer) {
     auto header = PacketHeader(buffer);
     DeliveryStatuses statuses = process_acks(header.ack_sequence_number(), header.ack_bitmask());
     usize processed_byte_count = process_packet_header(header, buffer);
@@ -194,7 +194,7 @@ private:
     }
   }
 
-  void add_pending_ack(u32 packet_id) {
+  void add_pending_ack(PacketId packet_id) {
     m_pending_acks.push(packet_id);
   }
 };

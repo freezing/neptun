@@ -78,7 +78,7 @@ private:
   std::vector<u8> m_network_buffer{};
   u32 m_packet_timeout;
 
-  Peer &find_or_create_peer(u32 next_expected_packet_id, IpAddress peer_ip) {
+  Peer &find_or_create_peer(PacketId next_expected_packet_id, IpAddress peer_ip) {
     if (!m_peers.contains(peer_ip)) {
       PacketDeliveryManager packet_delivery_manager{next_expected_packet_id, m_packet_timeout};
       ReliableStream reliable_stream{};
@@ -172,7 +172,7 @@ private:
   }
 
   static void process_delivery_statuses(Peer &peer, DeliveryStatuses delivery_statuses) {
-    delivery_statuses.template for_each([&peer](u32 packet_id, PacketDeliveryStatus status) {
+    delivery_statuses.template for_each([&peer](PacketId packet_id, PacketDeliveryStatus status) {
       peer.reliable_stream.on_packet_delivery_status(packet_id, status);
     });
   }

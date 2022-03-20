@@ -12,6 +12,10 @@ enum class PacketDeliveryStatus {
   DROP,
 };
 
+using PacketId = u32;
+using AckSequenceNumber = u32;
+using AckBitmask = u32;
+
 }
 
 #endif //NEPTUN_NEPTUN_COMMON_H

@@ -7,16 +7,17 @@
 
 #include "network/io_buffer.h"
 #include "common/types.h"
+#include "neptun/common.h"
 
 namespace freezing::network {
 
 class PacketHeader {
 public:
   static constexpr usize kIdOffset = 0;
-  static constexpr usize kAckSequenceNumberOffset = kIdOffset + sizeof(std::uint32_t);
-  static constexpr usize kAckBitmaskOffset = kAckSequenceNumberOffset + sizeof(std::uint32_t);
+  static constexpr usize kAckSequenceNumberOffset = kIdOffset + sizeof(PacketId);
+  static constexpr usize kAckBitmaskOffset = kAckSequenceNumberOffset + sizeof(AckSequenceNumber);
 
-  static constexpr usize kSerializedSize = sizeof(u32) + sizeof(u32) + sizeof(u32);
+  static constexpr usize kSerializedSize = sizeof(PacketId) + sizeof(AckSequenceNumber) + sizeof(AckBitmask);
 
   static byte_span write(byte_span buffer, u32 id, u32 ack_sequence_number, u32 ack_bitmask) {
     auto io = IoBuffer(buffer);
@@ -29,15 +30,15 @@ public:
 
   explicit PacketHeader(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
 
-  u32 id() const {
+  PacketId id() const {
     return m_buffer.read_u32(kIdOffset);
   }
 
-  u32 ack_sequence_number() const {
+  AckSequenceNumber ack_sequence_number() const {
     return m_buffer.read_u32(kAckSequenceNumberOffset);
   }
 
-  u32 ack_bitmask() const {
+  AckBitmask ack_bitmask() const {
     return m_buffer.read_u32(kAckBitmaskOffset);
   }
 

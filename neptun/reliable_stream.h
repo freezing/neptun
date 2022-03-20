@@ -46,7 +46,7 @@ struct PendingMessage {
 };
 
 struct InFlightMessage {
-  u32 packet_id;
+  PacketId packet_id;
   PendingMessage message;
 };
 
@@ -57,7 +57,7 @@ class ReliableStream {
 public:
   explicit ReliableStream(usize buffer_capacity = 3200) : m_buffer(buffer_capacity) {}
 
-  void on_packet_delivery_status(u32 packet_id, PacketDeliveryStatus status) {
+  void on_packet_delivery_status(PacketId packet_id, PacketDeliveryStatus status) {
     switch (status) {
     case PacketDeliveryStatus::ACK:
       while (!in_flight_messages.empty() && in_flight_messages.front().packet_id == packet_id) {
@@ -83,7 +83,7 @@ public:
 
   template<typename ReliableMessageCallback>
   // TODO: Instead of a callback, maybe return a list of spans that represent reliable messages?
-  expected<usize, NeptunError> read(u16 packet_id, byte_span buffer, ReliableMessageCallback callback) {
+  expected<usize, NeptunError> read(PacketId packet_id, byte_span buffer, ReliableMessageCallback callback) {
     if (Segment::kSerializedSize > buffer.size()) {
       // No segment to read.
       return 0;
@@ -120,7 +120,7 @@ public:
     return idx;
   }
 
-  usize write(u32 packet_id, byte_span buffer) {
+  usize write(PacketId packet_id, byte_span buffer) {
     // Figure out how many messages can we write.
     usize total_size = Segment::kSerializedSize;
     usize message_count = 0;

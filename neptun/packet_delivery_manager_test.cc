@@ -57,7 +57,7 @@ TEST(PacketDeliveryManagerTest, AcksAndDropsSentPackets) {
   PacketDeliveryManager manager{kInitialExpectedPacketId};
 
   // Send 30 packets.
-  for (u32 packet_id = 0; packet_id < 30; packet_id++) {
+  for (PacketId packet_id = 0; packet_id < 30; packet_id++) {
     auto write_buffer = make_buffer();
     manager.write(write_buffer, kNow);
   }
@@ -103,11 +103,11 @@ TEST(PacketDeliveryManagerTest, AcksAndDropsSentPackets) {
 
 TEST(PacketDeliveryManagerTest, BoundaryAck) {
   // Irrelevant for the test.
-  constexpr u32 kInitialExpectedPacketId = 10;
+  constexpr PacketId kInitialExpectedPacketId = 10;
   PacketDeliveryManager manager{kInitialExpectedPacketId};
 
   // Send 34 packets.
-  for (u32 packet_id = 0; packet_id < 34; packet_id++) {
+  for (PacketId packet_id = 0; packet_id < 34; packet_id++) {
     auto write_buffer = make_buffer();
     manager.write(write_buffer, kNow);
   }
@@ -158,12 +158,12 @@ TEST(PacketDeliveryManagerTest, BoundaryAck) {
 
 TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
   // Irrelevant for the test.
-  constexpr u32 kInitialExpectedPacketId = 10;
+  constexpr PacketId kInitialExpectedPacketId = 10;
   constexpr u32 kPacketTimeoutSeconds = 5;
   PacketDeliveryManager manager{kInitialExpectedPacketId, kPacketTimeoutSeconds};
 
   // Send 34 packets.
-  for (u32 packet_id = 0; packet_id < 34; packet_id++) {
+  for (PacketId packet_id = 0; packet_id < 34; packet_id++) {
     auto write_buffer = make_buffer();
     manager.write(write_buffer, kNow + packet_id);
   }
@@ -182,10 +182,10 @@ TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
 }
 
 TEST(PacketDeliveryManagerTest, ReadsExpectedPackets) {
-  constexpr u32 kExpectedPacketId = 10;
+  constexpr PacketId kExpectedPacketId = 10;
   PacketDeliveryManager manager{kExpectedPacketId};
 
-  for (u32 packet_id = 10; packet_id < 20; packet_id++) {
+  for (PacketId packet_id = 10; packet_id < 20; packet_id++) {
     auto buffer = make_buffer();
     // Acks are irrelevant for this test.
     auto ack_sequence_number = 0;
@@ -198,11 +198,11 @@ TEST(PacketDeliveryManagerTest, ReadsExpectedPackets) {
 }
 
 TEST(PacketDeliveryManagerTest, ReadsPacketsAfterExpected) {
-  constexpr u32 kExpectedPacketId = 10;
+  constexpr PacketId kExpectedPacketId = 10;
   PacketDeliveryManager manager{kExpectedPacketId};
 
   auto buffer = make_buffer();
-  constexpr u32 packet_id = 15;
+  constexpr PacketId packet_id = 15;
   // Acks are irrelevant for this test.
   auto ack_sequence_number = 0;
   auto ack_bitmask = 0;
@@ -213,11 +213,11 @@ TEST(PacketDeliveryManagerTest, ReadsPacketsAfterExpected) {
 }
 
 TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
-  constexpr u32 kExpectedPacketId = 10;
+  constexpr PacketId kExpectedPacketId = 10;
   PacketDeliveryManager manager{kExpectedPacketId};
 
   auto buffer = make_buffer();
-  constexpr u32 packet_id = 9;
+  constexpr PacketId packet_id = 9;
   // Acks are irrelevant for this test.
   auto ack_sequence_number = 0;
   auto ack_bitmask = 0;
