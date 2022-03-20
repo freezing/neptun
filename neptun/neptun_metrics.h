@@ -26,12 +26,12 @@ std::string metric_key_name(Key);
 template<typename Key>
 void foreach_key(const std::function<void(Key)>&);
 
-template<typename Key>
+template<typename Key, typename Value>
 class Metrics {
 public:
   explicit Metrics(std::string&& name) : m_name{std::move(name)} {}
 
-  void inc(Key key, u64 value) {
+  void inc(Key key, Value value) {
     m_values[metric_key_index(key)] += value;
   }
 
@@ -39,11 +39,11 @@ public:
     inc(key, 1);
   }
 
-  u64 value(Key key) const {
+  Value value(Key key) const {
     return m_values[metric_key_index(key)];
   }
 
-  u64 value_by_index(usize index) const {
+  Value value_by_index(usize index) const {
     return m_values[index];
   }
 
@@ -52,12 +52,12 @@ public:
   }
 
 private:
-  std::array<u64, metric_key_count<Key>()> m_values{};
+  std::array<Value, metric_key_count<Key>()> m_values{};
   std::string m_name;
 };
 
-template<typename Key>
-std::ostream& operator<<(std::ostream& os, const Metrics<Key>& metrics) {
+template<typename Key, typename Value>
+std::ostream& operator<<(std::ostream& os, const Metrics<Key, Value>& metrics) {
   os << metrics.name() << std::endl;
   foreach_key<Key>([&os, &metrics](Key key) {
     os << "    " << metric_key_name(key) << ": " << metrics.value(key) << std::endl;
@@ -106,7 +106,7 @@ void foreach_key<NeptunMetricKey>(const std::function<void(NeptunMetricKey)>& fn
   }
 }
 
-using NeptunMetrics = Metrics<NeptunMetricKey>;
+using NeptunMetrics = Metrics<NeptunMetricKey, u64>;
 
 }
 

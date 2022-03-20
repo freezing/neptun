@@ -72,6 +72,8 @@ int main(int argc, char **argv) {
   u32 reliable_msg_seq_num = 0;
   u32 unreliable_msg_seq_num = 0;
   usize chars_read = 0;
+  NeptunMetrics last_metrics{"Rate"};
+  std::chrono::sys_time<std::chrono::nanoseconds> last_print_metrics_time{};
   while (true) {
     auto now = chrono::system_clock::now();
 
@@ -115,7 +117,23 @@ int main(int argc, char **argv) {
     }
 
     if (print_metrics_ticker.tick(now)) {
+      // Print total
       std::cout << neptun.metrics() << std::endl;
+
+      // Print rate
+      Metrics<NeptunMetricKey, double> rate{"Neptun Rate /s"};
+      foreach_key<NeptunMetricKey>([&rate, &neptun, last_metrics, last_print_metrics_time, now](
+          NeptunMetricKey key) {
+        double delta = neptun.metrics().value(key) - last_metrics.value(key);
+        double seconds =
+            std::chrono::duration_cast<std::chrono::seconds>(now - last_print_metrics_time).count();
+        rate.inc(key, delta / seconds);
+      });
+      std::cout << rate << std::endl << std::endl;
+
+      last_metrics = neptun.metrics();
+      // TODO: Can Ticker provide previous tick time?
+      last_print_metrics_time = now;
     }
 
     auto print_string = [&chars_read](byte_span buffer) {
