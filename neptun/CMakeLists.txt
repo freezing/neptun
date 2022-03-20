@@ -12,6 +12,9 @@ target_link_libraries(bin_neptun lib_neptun)
 add_executable(bin_udp example_udp.cc)
 target_link_libraries(bin_udp lib_neptun)
 
+add_executable(pcap pcap/main.cc pcap/file_format.h)
+target_link_libraries(pcap LINK_PUBLIC lib_neptun lib_common expected)
+
 # Tests
 
 include(FetchContent)

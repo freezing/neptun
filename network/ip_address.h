@@ -44,6 +44,8 @@ static std::string ip_host_to_string(std::uint32_t ip) {
 }
 }
 
+// TODO: Should port be part of IpAddress? If so, should the name reflect that?
+// E.g. at the IP level we don't know anything about ports, so this is a bit weird.
 class IpAddress {
 public:
   static IpAddress from_ipv4(const std::string& ip, std::uint16_t port) {
@@ -56,6 +58,16 @@ public:
     socket_address.sin_port = htons(port);
     // Convert IP to network-endian long (32-bits).
     socket_address.sin_addr.s_addr = htonl(detail::ip_string_to_host(ip));
+    return IpAddress{socket_address};
+  }
+
+  static IpAddress from_u32(u32 ip, std::uint16_t port) {
+    sockaddr_in socket_address{};
+    memset((char *) &socket_address, 0, sizeof(socket_address));
+    // AF_INET is for IPv4 (AF_INET6 is for IPv6)
+    socket_address.sin_family = AF_INET;
+    socket_address.sin_port = htons(port);
+    socket_address.sin_addr.s_addr = htonl(ip);
     return IpAddress{socket_address};
   }
 

@@ -21,6 +21,7 @@ public:
     return sizeof(u32) + sizeof(u16) + payload_size;
   }
 
+  // TODO: Payload already has length.
   static byte_span write(byte_span buffer, u32 sequence_number, u16 length, byte_span payload) {
     auto io = IoBuffer(buffer);
     usize count = 0;

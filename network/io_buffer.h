@@ -18,12 +18,34 @@
 
 namespace freezing::network {
 
+// Functions for serializing and deserializing primitive types.
+// The current implementation assumes that the buffer encoding is in network-endian (big-endian).
+// At the moment, the smallest granularity at which IoBuffer works is one byte,
+// but it should be extended to support granularity at one bit.
 class IoBuffer {
 public:
   IoBuffer(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
 
   usize size() const {
     return m_buffer.size();
+  }
+
+  // Decode [lower_bound, upper_bound) bits.
+  template<typename T, usize lower_bound, usize upper_bound>
+  constexpr T read_bits() {
+    static_assert(upper_bound - lower_bound <= sizeof(T) * 8,
+                  "number of bits exceeds the size of the returned type");
+    T result = 0;
+    for (T global_bit_index = lower_bound; global_bit_index < upper_bound; global_bit_index++) {
+      T byte_index = global_bit_index / 8;
+      T bit_index_in_byte = 7 - global_bit_index % 8;
+      T byte_value = read_u8(byte_index);
+      T bit_index_in_result = upper_bound - global_bit_index - 1;
+      T bit_set_in_byte = (byte_value >> bit_index_in_byte) & 0b1;
+      T bit_value_in_result = 1 << bit_index_in_result;
+      result += bit_set_in_byte * bit_value_in_result;
+    }
+    return result;
   }
 
   template<typename T>
