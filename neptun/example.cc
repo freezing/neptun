@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
   Neptun<OsNetwork> neptun{OS_NETWORK, ip};
 
-  Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(10));
+  Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(0));
   Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
 
   std::vector<std::uint8_t> buffer(1600);
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
           usize serialized_size = sizeof(u16) + s.size();
           if (serialized_size > buffer.size()) {
             // Flow control kicking in.
-            std::cout << "Reliable Flow Control kicking in." << std::endl;
+//            std::cout << "Reliable Flow Control kicking in." << std::endl;
             return byte_span{};
           }
           auto count = io.write_string(s, 0);
@@ -102,7 +102,7 @@ int main(int argc, char **argv) {
           usize serialized_size = sizeof(u16) + s.size();
           if (serialized_size > buffer.size()) {
             // Flow control kicking in.
-            std::cout << "Unreliable buffers are full." << std::endl;
+//            std::cout << "Unreliable buffers are full." << std::endl;
             return byte_span{};
           }
           auto count = io.write_string(s, 0);
@@ -123,6 +123,6 @@ int main(int argc, char **argv) {
                 print_string);
 
     // Run this loop ~100 times a second.
-    this_thread::sleep_for(chrono::milliseconds(10));
+//    this_thread::sleep_for(chrono::milliseconds(10));
   }
 }

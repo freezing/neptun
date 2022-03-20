@@ -120,7 +120,7 @@ public:
     return idx;
   }
 
-  usize write(u16 packet_id, byte_span buffer) {
+  usize write(u32 packet_id, byte_span buffer) {
     // Figure out how many messages can we write.
     usize total_size = Segment::kSerializedSize;
     usize message_count = 0;

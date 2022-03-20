@@ -257,3 +257,11 @@ TEST(PacketDeliveryManagerTest, WriteAndReadPacketWithAcks) {
     }
   }
 }
+
+TEST(PacketDeliveryManagerTest, PeerAcksPacketThatWeHaventSent) {
+  // Peer is malicous.
+  // We send packets [0, 1, 2, 3, 4, 5]
+  // Let's say client acks packet 10.
+  // Malicious client.
+  FAIL();
+}
