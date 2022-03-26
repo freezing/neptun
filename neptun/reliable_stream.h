@@ -67,6 +67,7 @@ public:
       assert(in_flight_messages.empty() || in_flight_messages.front().packet_id > packet_id);
       break;
     case PacketDeliveryStatus::DROP:
+      // TODO: This assertion happens when a few processes run for a very long time.
       assert(in_flight_messages.empty() || in_flight_messages.front().packet_id >= packet_id);
       std::stack<PendingMessage> reversed_messages;
       while (!in_flight_messages.empty()) {
