@@ -26,6 +26,7 @@ using NetworkMetrics = Metrics<NetworkMetricKey, u64>;
 
 namespace freezing {
 
+// TODO: Warning: explicit specialization cannot have a storage class.
 template<>
 static constexpr usize metric_key_count<network::NetworkMetricKey>() {
   return 4;

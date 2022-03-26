@@ -3,6 +3,7 @@
 #include <thread>
 #include <vector>
 
+#include "common/ticker.h"
 #include "network/udp_socket.h"
 #include "network/message.h"
 #include "neptun.h"
@@ -23,33 +24,6 @@ static std::string span_to_string(std::span<std::uint8_t> data) {
   }
   return s;
 }
-
-class Ticker {
-public:
-  explicit Ticker(chrono::time_point<chrono::system_clock, chrono::nanoseconds> now,
-                  chrono::nanoseconds tick_interval) :
-      m_last_known_now{chrono::time_point_cast<chrono::nanoseconds>(now)},
-      m_tick_interval{tick_interval},
-      m_time_since_last_tick{tick_interval} {}
-
-  bool tick(chrono::time_point<chrono::system_clock, chrono::nanoseconds> now) {
-    auto elapsed_time = (now - m_last_known_now);
-    m_time_since_last_tick += elapsed_time;
-    m_last_known_now = now;
-
-    if (m_time_since_last_tick >= m_tick_interval) {
-      m_time_since_last_tick -= m_tick_interval;
-      return true;
-    }
-    return false;
-  }
-
-private:
-  chrono::time_point<chrono::system_clock, chrono::nanoseconds> m_last_known_now;
-  chrono::nanoseconds m_tick_interval;
-  chrono::nanoseconds m_time_since_last_tick;
-
-};
 
 int main(int argc, char **argv) {
   if (argc != 5) {

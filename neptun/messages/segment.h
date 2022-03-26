@@ -11,8 +11,11 @@
 namespace freezing::network {
 
 enum ManagerType {
-  RELIABLE_STREAM = 1,
-  UNRELIABLE_STREAM = 2,
+  MOVE_MANAGER = 1,
+  LATEST_STATE_MANAGER = 2,
+  // TODO: Rename to STREAM -> MANAGER
+  RELIABLE_STREAM = 3,
+  UNRELIABLE_STREAM = 4,
 };
 
 class Segment {
