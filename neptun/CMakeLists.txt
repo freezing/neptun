@@ -1,6 +1,6 @@
 include_directories(.)
 
-add_library(lib_neptun neptun.h messages/packet_header.h messages/message_header.h messages/segment.h reliable_stream.h common.h packet_delivery_manager.h messages/reliable_message.h error.h unreliable_stream.h neptun_metrics.h)
+add_library(lib_neptun neptun.h messages/packet_header.h messages/message_header.h messages/segment.h reliable_stream.h common.h packet_delivery_manager.h messages/reliable_message.h error.h unreliable_stream.h neptun_metrics.h connection_manager.h)
 target_link_libraries(lib_neptun LINK_PUBLIC lib_common lib_network expected)
 set_target_properties(lib_neptun PROPERTIES LINKER_LANGUAGE CXX)
 target_include_directories(lib_neptun PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -20,7 +20,7 @@ target_link_libraries(pcap LINK_PUBLIC lib_neptun lib_common expected)
 include(FetchContent)
 
 add_executable(
-        neptun_tests neptun_test.cc messages/packet_header.cc reliable_stream_test.cc packet_delivery_manager_test.cc)
+        neptun_tests neptun_test.cc messages/packet_header.cc reliable_stream_test.cc packet_delivery_manager_test.cc connection_manager_test.cc)
 
 target_link_libraries(
         neptun_tests

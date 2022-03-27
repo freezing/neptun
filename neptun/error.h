@@ -10,7 +10,9 @@
 namespace freezing::network {
 
 enum class NeptunError {
-  MALFORMED_PACKET = 0
+  MALFORMED_PACKET = 0,
+  PEER_NOT_RESPONDING = 1,
+  LETS_CONNECT_REJECTED = 2,
 };
 
 }

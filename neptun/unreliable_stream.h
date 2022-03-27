@@ -19,6 +19,7 @@ class UnreliableStream {
 public:
   explicit UnreliableStream(usize buffer_capacity = 3200) : m_buffer(buffer_capacity) {}
 
+  // TODO: Maybe rename [read] to [on_packet] and [write] to [tick] for each manager?
   template<typename UnreliableMessageCallback>
   expected<usize, NeptunError> read(byte_span buffer, UnreliableMessageCallback callback) {
     if (Segment::kSerializedSize > buffer.size()) {

@@ -11,6 +11,7 @@
 namespace freezing::network {
 
 enum ManagerType {
+  CONNECTION_MANAGER = 0,
   MOVE_MANAGER = 1,
   LATEST_STATE_MANAGER = 2,
   // TODO: Rename to STREAM -> MANAGER

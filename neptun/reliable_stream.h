@@ -143,7 +143,6 @@ public:
     auto segment = Segment::write(buffer, ManagerType::RELIABLE_STREAM, message_count);
 
     usize idx = segment.size();
-    auto io = IoBuffer{buffer};
     for (usize i = 0; i < message_count; i++) {
       auto pending_msg = pending_messages.front();
       auto payload = buffer_span(pending_msg.range);

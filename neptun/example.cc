@@ -12,6 +12,8 @@
 #include "neptun/messages/segment.h"
 #include "neptun/messages/reliable_message.h"
 #include "neptun/neptun.h"
+#include "neptun/messages/lets_connect.h"
+#include "neptun/messages/reject_lets_connect.h"
 
 using namespace std;
 using namespace freezing;
