@@ -104,7 +104,9 @@ public:
     }
     auto packet = std::move(udp_packets.packets.front());
     udp_packets.packets.pop();
-    m_stats[*ip].num_read_packets++;
+    auto& stats = m_stats[*ip];
+    stats.num_read_packets++;
+    stats.num_read_bytes += packet.payload.size();
 
     // Any data in the packet that can't fit in the buffer is dropped.
     int idx = 0;
@@ -115,6 +117,7 @@ public:
       }
       *it = packet.payload[idx++];
     }
+
     return {{packet.sender, {buffer.subspan(0, idx)}}};
   }
 
@@ -176,6 +179,10 @@ public:
       return Stats{};
     }
     return it->second;
+  }
+
+  void clear_stats() {
+    m_stats.clear();
   }
 
 private:

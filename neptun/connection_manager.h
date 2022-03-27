@@ -18,6 +18,7 @@
 
 namespace freezing::network {
 
+// 0 packet rate means no limit.
 struct BandwidthLimit {
   // Maximum rate of incoming packets.
   u8 max_read_packet_rate;
@@ -28,8 +29,7 @@ struct BandwidthLimit {
   // Maximum size of the outgoing packet in bytes.
   u16 max_send_packet_size;
 
-
-  bool operator <=>(const BandwidthLimit&) const = default;
+  bool operator<=>(const BandwidthLimit &) const = default;
 };
 
 struct ConnectionManagerConfig {
@@ -107,33 +107,38 @@ public:
     m_is_initiator = true;
   }
 
-  bool is_handshake_successful() const {
+  bool is_peer_connected() const {
     return m_peer_bandwidth_limit.has_value();
+  }
+
+  bool is_fully_connected() const {
+    return is_peer_connected() && m_self_is_connected;
   }
 
   void on_packet_status_delivery(PacketId packet_id, PacketDeliveryStatus status) {
     switch (status) {
-    case PacketDeliveryStatus::ACK: {
-      if (!m_in_flight_lets_connect.empty() && m_in_flight_lets_connect.front() == packet_id) {
-        // Clear the queue.
-        while (!m_in_flight_lets_connect.empty()) {
+      case PacketDeliveryStatus::ACK: {
+        if (!m_in_flight_lets_connect.empty() && m_in_flight_lets_connect.front() == packet_id) {
+          m_self_is_connected = true;
+          // Clear the queue.
+          while (!m_in_flight_lets_connect.empty()) {
+            m_in_flight_lets_connect.pop();
+          }
           m_in_flight_lets_connect.pop();
+          // No need to send redundant packets anymore.
+          m_num_lets_connect_to_send = 0;
         }
-        m_in_flight_lets_connect.pop();
-        // No need to send redundant packets anymore.
-        m_num_lets_connect_to_send = 0;
+        break;
       }
-      break;
-    }
-    case PacketDeliveryStatus::DROP: {
-      if (!m_in_flight_lets_connect.empty() && m_in_flight_lets_connect.front() == packet_id) {
-        m_in_flight_lets_connect.pop();
-        if (!m_peer_bandwidth_limit.has_value()) {
-          m_num_lets_connect_to_send++;
+      case PacketDeliveryStatus::DROP: {
+        if (!m_in_flight_lets_connect.empty() && m_in_flight_lets_connect.front() == packet_id) {
+          m_in_flight_lets_connect.pop();
+          if (!m_peer_bandwidth_limit.has_value()) {
+            m_num_lets_connect_to_send++;
+          }
         }
+        break;
       }
-      break;
-    }
     }
   }
 
@@ -160,27 +165,28 @@ public:
     idx += MessageHeader::kSerializedSize;
 
     switch (message_header.message_type()) {
-    case LetsConnect::kId: {
-      LetsConnect lets_connect(advance(buffer, idx));
-      if (validate(lets_connect)) {
-        // If we see any invalid requests, all future requests are ignored.
-        is_fail = false;
-        if (!m_is_initiator) {
-          // This is a request.
-          m_num_lets_connect_to_send = m_config.num_redundant_packets + 1;
-          set_peer_bandwidth_limit(lets_connect);
+      case LetsConnect::kId: {
+        LetsConnect lets_connect(advance(buffer, idx));
+        if (validate(lets_connect)) {
+          // If we see any invalid requests, all future requests are ignored.
+          is_fail = false;
+          if (!m_is_initiator) {
+            // This is a request.
+            m_num_lets_connect_to_send = m_config.num_redundant_packets + 1;
+            set_peer_bandwidth_limit(lets_connect);
+          } else {
+            // This is a response.
+            set_peer_bandwidth_limit(lets_connect);
+          }
         } else {
-          // This is a response.
-          set_peer_bandwidth_limit(lets_connect);
+          is_fail = true;
         }
-      } else {
-        is_fail = true;
+        return idx + LetsConnect::kSerializedSize;
       }
-      return idx + LetsConnect::kSerializedSize;
-    }
-    case RejectLetsConnect::kId:
-      return make_error(NeptunError::LETS_CONNECT_REJECTED);
-    default:return make_error(NeptunError::MALFORMED_PACKET);
+      case RejectLetsConnect::kId:
+        return make_error(NeptunError::LETS_CONNECT_REJECTED);
+      default:
+        return make_error(NeptunError::MALFORMED_PACKET);
     }
   }
 
@@ -225,21 +231,22 @@ private:
   usize m_num_lets_connect_to_send{0};
   bool is_fail{false};
   bool m_is_initiator{false};
+  bool m_self_is_connected{false};
   std::optional<BandwidthLimit> m_peer_bandwidth_limit{};
 
   bool validate(LetsConnect lets_connect) {
-    // There's nothing to validate. I may decide to remove this if it's not needed.
-    return true;
+    return (lets_connect.max_send_packet_size() >= 100
+        && lets_connect.max_read_packet_size() >= 100);
   }
 
   void set_peer_bandwidth_limit(LetsConnect lets_connect) {
     m_peer_bandwidth_limit =
         BandwidthLimit{
-      .max_send_packet_rate = lets_connect.max_send_packet_rate(),
-      .max_read_packet_rate = lets_connect.max_read_packet_rate(),
-      .max_send_packet_size = lets_connect.max_send_packet_size(),
-      .max_read_packet_size = lets_connect.max_read_packet_size()
-      };
+            .max_read_packet_rate = lets_connect.max_read_packet_rate(),
+            .max_read_packet_size = lets_connect.max_read_packet_size(),
+            .max_send_packet_rate = lets_connect.max_send_packet_rate(),
+            .max_send_packet_size = lets_connect.max_send_packet_size(),
+        };
   }
 };
 

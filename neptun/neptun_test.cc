@@ -14,7 +14,7 @@ namespace {
 const IpAddress kServerIp = IpAddress::from_ipv4("192.168.0.10", 1000);
 const IpAddress kClientIp = IpAddress::from_ipv4("192.168.0.11", 2000);
 constexpr ConnectionManagerConfig kConnectionManagerConfig{5,
-                                                           BandwidthLimit{.max_read_packet_rate=120, .max_read_packet_size=1400, .max_send_packet_rate=60, .max_send_packet_size=800}};
+                                                           BandwidthLimit{.max_read_packet_rate=0, .max_read_packet_size=1400, .max_send_packet_rate=0, .max_send_packet_size=800}};
 const FakeClock::time_point kNow = FakeClock::now();
 
 const auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
@@ -23,13 +23,18 @@ const auto unexpected_reliable_msgs = [](byte_span buffer) { FAIL(); };
 using TestNeptun = Neptun<FakeNetwork, FakeClock>;
 
 void connect(TestNeptun &server, TestNeptun &client, FakeNetwork &fake_network) {
-  client.connect(kServerIp);
+  client.connect(kServerIp, kNow);
   client.tick(kNow);
   server.tick(kNow);
-  // Process server's response. But do not send any packets.
-  fake_network.drop_packets(true);
+  // Process server's response and send back the ACK.
+  // TODO: This is ugly. I don't like these tests.
+  // HACK: Ensure that the client wants to send the packet to the server after seeing its
+  // desired rate.
+  // The proper fix should be something like the first packet is sent immeidately, or
+  // maybe decouple the initial handshake logic from the tick. Don't know.
   client.tick(kNow);
-  fake_network.drop_packets(false);
+  client.tick(kNow + milliseconds(100));
+  server.tick(kNow + milliseconds(100));
 }
 
 TEST(NeptunTest, ConnectionHandshake) {
@@ -56,6 +61,8 @@ TEST(NeptunTest, PacketRateLimit) {
       .max_send_packet_rate = 30,
       .max_send_packet_size = 400,
   };
+//  fake_network.log_packets(true);
+//  fake_network.set_packet_formatter(format_neptun_payload);
   TestNeptun server{fake_network, kServerIp, ConnectionManagerConfig{0, server_limit}};
   TestNeptun client{fake_network, kClientIp, ConnectionManagerConfig{0, client_limit}};
   connect(server, client, fake_network);
@@ -64,18 +71,21 @@ TEST(NeptunTest, PacketRateLimit) {
   // We expect:
   //   - Server to receive 60 packets (not 120, because client can send maximum 60 packets a second)
   //   - Client to receive 30 packets
+  fake_network.clear_stats();
+  // Offset time is needed to ensure packets sent during the connection do not affect the rate.
+  seconds offset_time{1};
   for (usize ms = 0; ms < 1000; ms++) {
-    auto now = kNow + milliseconds(ms);
+    auto now = kNow + offset_time + milliseconds(ms);
     client.tick(now);
     server.tick(now);
   }
 
   auto server_stats = fake_network.stats(kServerIp);
   auto client_stats = fake_network.stats(kClientIp);
-  ASSERT_EQ(server_stats.num_sent_packets, 30);
-  ASSERT_EQ(client_stats.num_read_packets, 30);
-  ASSERT_EQ(server_stats.num_read_packets, 120);
-  ASSERT_EQ(client_stats.num_sent_packets, 120);
+  ASSERT_EQ(server_stats.num_sent_packets, 60);
+  ASSERT_EQ(client_stats.num_read_packets, 61);
+  ASSERT_EQ(server_stats.num_read_packets, 30);
+  ASSERT_EQ(client_stats.num_sent_packets, 30);
 }
 
 TEST(NeptunTest, PacketSizeLimit) {
@@ -87,11 +97,11 @@ TEST(NeptunTest, PacketSizeLimit) {
       .max_send_packet_size = 1400,
   };
   auto client_limit = BandwidthLimit{
-    .max_read_packet_rate = 60,
-    .max_read_packet_size = 800,
-    // We pretend that the upload speed is smaller on the client.
-    .max_send_packet_rate = 30,
-    .max_send_packet_size = 400,
+      .max_read_packet_rate = 60,
+      .max_read_packet_size = 800,
+      // We pretend that the upload speed is smaller on the client.
+      .max_send_packet_rate = 30,
+      .max_send_packet_size = 400,
   };
   TestNeptun server{fake_network, kServerIp, ConnectionManagerConfig{0, server_limit}};
   TestNeptun client{fake_network, kClientIp, ConnectionManagerConfig{0, client_limit}};
@@ -101,28 +111,34 @@ TEST(NeptunTest, PacketSizeLimit) {
   // We expect:
   //   - Server to receive a packet of size ~1400 (a bit less)
   //   - Client to receive a packet of size ~400 (a bit less)
+  fake_network.clear_stats();
   constexpr usize kTooManyReliableMsgsCount = 1000;
+  const nanoseconds offset_time = seconds(1);
   for (usize i = 0; i < kTooManyReliableMsgsCount; i++) {
+    ASSERT_TRUE(client.is_connected(kServerIp));
     client.send_reliable_to(kServerIp, [i](byte_span buffer) {
       IoBuffer io(buffer);
       auto count = io.write_u16(i, 0);
       return buffer.first(count);
-    });
+    }, kNow + offset_time);
     server.send_reliable_to(kClientIp, [i](byte_span buffer) {
       IoBuffer io(buffer);
       auto count = io.write_u16(i, 0);
       return buffer.first(count);
-    });
+    }, kNow + offset_time);
   }
-  client.tick(kNow);
-  server.tick(kNow);
+  client.tick(kNow + offset_time);
+  server.tick(kNow + offset_time);
+  // Ensure the client hsa read the packets from its queue.
+  fake_network.drop_packets(true);
+  client.tick(kNow + offset_time);
 
   auto server_stats = fake_network.stats(kServerIp);
   auto client_stats = fake_network.stats(kClientIp);
-  ASSERT_EQ(server_stats.num_sent_bytes, 400);
-  ASSERT_EQ(client_stats.num_read_bytes, 400);
-  ASSERT_EQ(server_stats.num_read_bytes, 1400);
-  ASSERT_EQ(client_stats.num_sent_bytes, 400);
+  ASSERT_EQ(server_stats.num_sent_bytes, 766);
+  ASSERT_EQ(client_stats.num_read_bytes, 778);
+  ASSERT_EQ(server_stats.num_read_bytes, 398);
+  ASSERT_EQ(client_stats.num_sent_bytes, 398);
 }
 
 TEST(NeptunTest, DropConnectionIfPacketLimitIsViolated) {
@@ -140,7 +156,7 @@ TEST(NeptunTest, ReadAndWriteSingleReliableMessage) {
     IoBuffer io{buffer};
     auto count = io.write_string("this is test string", 0);
     return buffer.first(count);
-  });
+  }, kNow);
   client.tick(kNow, unexpected_reliable_msgs);
 
   usize msg_count = 0;
@@ -162,7 +178,7 @@ TEST(NeptunTest, ReadAndWriteSingleReliableMessage_DropPackets) {
     IoBuffer io{buffer};
     auto count = io.write_string("this is test string", 0);
     return buffer.first(count);
-  });
+  }, kNow);
   fake_network.drop_packets(true);
   client.tick(kNow, unexpected_reliable_msgs);
 
@@ -218,7 +234,7 @@ TEST(NeptunTest, ReadAndWriteMultipleReliableMessage) {
       IoBuffer io{buffer};
       auto count = io.write_string("this is test string " + std::to_string(i), 0);
       return buffer.first(count);
-    });
+    }, kNow);
   }
   client.tick(kNow, unexpected_reliable_msgs);
 
@@ -232,18 +248,18 @@ TEST(NeptunTest, ReadAndWriteMultipleReliableMessage) {
 }
 
 TEST(NeptunTest, Timeouts) {
-  constexpr u32 kPacketTimeoutSeconds = 5;
+  constexpr seconds kPacketTimeout = seconds(5);
 
   FakeNetwork fake_network{};
   TestNeptun server{fake_network, kServerIp, kConnectionManagerConfig};
-  TestNeptun client{fake_network, kClientIp, kConnectionManagerConfig, kPacketTimeoutSeconds};
+  TestNeptun client{fake_network, kClientIp, kConnectionManagerConfig, kPacketTimeout};
   connect(server, client, fake_network);
 
   client.send_reliable_to(kServerIp, [](byte_span buffer) {
     IoBuffer io{buffer};
     auto count = io.write_string("this is test string", 0);
     return buffer.first(count);
-  });
+  }, kNow);
   fake_network.drop_packets(true);
   client.tick(kNow, unexpected_reliable_msgs);
   server.tick(kNow, unexpected_reliable_msgs);
@@ -270,7 +286,7 @@ TEST(NeptunTest, ReliableMessageAfterDroppingMultiplePackets) {
       IoBuffer io{buffer};
       auto count = io.write_string("this is test string " + std::to_string(sequence_number), 0);
       return buffer.first(count);
-    });
+    }, kNow);
   };
 
   // Drop first 5 packets.
@@ -312,7 +328,7 @@ TEST(NeptunTest, UnreliableMessage) {
     IoBuffer io{buffer};
     auto count = io.write_string("unreliable value", 0);
     return buffer.first(count);
-  });
+  }, kNow);
 
   client.tick(kNow);
 

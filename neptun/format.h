@@ -19,7 +19,7 @@
 
 namespace freezing::network {
 
-std::string to_hex(byte_span payload) {
+inline std::string to_hex(byte_span payload) {
   std::stringstream ss;
   std::string sep{};
   for (auto byte : payload) {
@@ -29,7 +29,7 @@ std::string to_hex(byte_span payload) {
   return ss.str();
 };
 
-std::string format_neptun_payload(byte_span payload) {
+inline std::string format_neptun_payload(byte_span payload) {
   // TODO: Header must have protocol_id to allow us to identify neptun packets.
   auto packet_header = PacketHeader(payload);
   payload = advance(payload, PacketHeader::kSerializedSize);

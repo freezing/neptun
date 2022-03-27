@@ -39,8 +39,16 @@ int main(int argc, char **argv) {
 
   auto ip = IpAddress::from_ipv4(argv[1], stoi(argv[2]));
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
-  ConnectionManagerConfig config{5, BandwidthLimit{120, 1400}};
+  ConnectionManagerConfig config{5, BandwidthLimit{120, 1400, 120, 1400}};
   Neptun<OsNetwork, system_clock> neptun{OS_NETWORK, ip, config};
+  neptun.connect(peer_ip, system_clock::now());
+
+  while (!neptun.is_connected(peer_ip)) {
+    std::cout << "Waiting to connect..." << std::endl;
+    neptun.tick(system_clock::now());
+    this_thread::sleep_for(milliseconds(1000));
+  }
+  std::cout << "Successfully connected." << std::endl;
 
   Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(0));
   Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
@@ -54,7 +62,7 @@ int main(int argc, char **argv) {
   NetworkMetrics last_network_metrics{"Network Rate"};
   std::chrono::sys_time<std::chrono::nanoseconds> last_print_metrics_time{};
   while (true) {
-    auto now = time_point_cast<milliseconds>(chrono::system_clock::now());
+    auto now = time_point_cast<milliseconds>(system_clock::now());
 
     if (reliable_ticker.tick(now)) {
       for (usize i = 0; i < kNumReliableMsgsPerBatch; i++) {
@@ -72,7 +80,7 @@ int main(int argc, char **argv) {
           auto count = io.write_string(s, 0);
           reliable_msg_seq_num++;
           return buffer.first(count);
-        });
+        }, now);
       }
     }
 
@@ -91,7 +99,7 @@ int main(int argc, char **argv) {
           auto count = io.write_string(s, 0);
           unreliable_msg_seq_num++;
           return buffer.first(count);
-        });
+        }, now);
       }
     }
 

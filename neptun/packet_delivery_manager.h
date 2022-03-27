@@ -17,7 +17,7 @@ namespace freezing::network {
 
 namespace detail {
 
-static constexpr u32 kDefaultPacketTimeSeconds = 5;
+static const seconds kDefaultPacketTimeout = seconds(5);
 
 template<typename Clock>
 struct InFlightPacket {
@@ -70,9 +70,9 @@ class PacketDeliveryManager {
 public:
   explicit PacketDeliveryManager(
       PacketId next_expected_packet_id,
-      u32 packet_timeout_seconds = detail::kDefaultPacketTimeSeconds) : m_next_expected_packet_id{
+      milliseconds packet_timeout = detail::kDefaultPacketTimeout) : m_next_expected_packet_id{
       next_expected_packet_id}, m_packet_timeout{
-      packet_timeout_seconds} {}
+      packet_timeout} {}
 
   // TODO: API should be clearer. I get confused by what is what.
   // If the returned usize is 0, then the packet should not be processed.

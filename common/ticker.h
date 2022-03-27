@@ -5,34 +5,54 @@
 #ifndef NEPTUN_COMMON_TICKER_H
 #define NEPTUN_COMMON_TICKER_H
 
-#include <chrono>
+#include "common/types.h"
 
 namespace freezing {
 
+template<typename Clock>
 class Ticker {
 public:
-  explicit Ticker(std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> now,
-                  std::chrono::nanoseconds tick_interval) :
-      m_last_known_now{std::chrono::time_point_cast<std::chrono::nanoseconds>(now)},
-      m_tick_interval{tick_interval},
-      m_time_since_last_tick{tick_interval} {}
+  explicit Ticker(time_point<Clock> now,
+                  std::optional<nanoseconds> tick_interval) :
+      m_last_known_now{std::chrono::time_point_cast<nanoseconds>(now)},
+      m_tick_interval{tick_interval} {}
 
-  bool tick(std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> now) {
-    auto elapsed_time = (now - m_last_known_now);
-    m_time_since_last_tick += elapsed_time;
+  bool tick(time_point<Clock> now) {
+    auto elapsed_time = calc_elapsed_time(now);
     m_last_known_now = now;
 
-    if (m_time_since_last_tick >= m_tick_interval) {
-      m_time_since_last_tick -= m_tick_interval;
+    if (!elapsed_time || !m_tick_interval) {
+      m_time_since_last_tick = nanoseconds(0);
+      return true;
+    }
+    m_time_since_last_tick += *elapsed_time;
+    if (m_time_since_last_tick >= *m_tick_interval) {
+      m_time_since_last_tick %= *m_tick_interval;
       return true;
     }
     return false;
   }
 
+  void set_tick_interval(nanoseconds tick_interval) {
+    m_tick_interval = tick_interval;
+  }
+
+  void clear_tick_interval() {
+    m_tick_interval.reset();
+  }
+
 private:
-  std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> m_last_known_now;
-  std::chrono::nanoseconds m_tick_interval;
-  std::chrono::nanoseconds m_time_since_last_tick;
+  std::optional<time_point<Clock>> m_last_known_now;
+  std::optional<nanoseconds> m_tick_interval;
+  nanoseconds m_time_since_last_tick{};
+
+  std::optional<nanoseconds> calc_elapsed_time(time_point<Clock> now) const {
+    if (m_last_known_now) {
+      return {now - *m_last_known_now};
+    } else {
+      return {};
+    }
+  }
 };
 
 }

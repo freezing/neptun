@@ -159,8 +159,8 @@ TEST(PacketDeliveryManagerTest, BoundaryAck) {
 TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
   // Irrelevant for the test.
   constexpr PacketId kInitialExpectedPacketId = 10;
-  constexpr u32 kPacketTimeoutSeconds = 5;
-  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId, kPacketTimeoutSeconds};
+  const seconds kPacketTimeout = seconds(5);
+  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId, kPacketTimeout};
 
   // Send 34 packets.
   for (PacketId packet_id = 0; packet_id < 34; packet_id++) {
