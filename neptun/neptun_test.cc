@@ -33,6 +33,7 @@ void connect(TestNeptun &server, TestNeptun &client, FakeNetwork &fake_network) 
   // The proper fix should be something like the first packet is sent immeidately, or
   // maybe decouple the initial handshake logic from the tick. Don't know.
   client.tick(kNow);
+  server.tick(kNow);
   client.tick(kNow + milliseconds(100));
   server.tick(kNow + milliseconds(100));
 }
@@ -61,8 +62,6 @@ TEST(NeptunTest, PacketRateLimit) {
       .max_send_packet_rate = 30,
       .max_send_packet_size = 400,
   };
-//  fake_network.log_packets(true);
-//  fake_network.set_packet_formatter(format_neptun_payload);
   TestNeptun server{fake_network, kServerIp, ConnectionManagerConfig{0, server_limit}};
   TestNeptun client{fake_network, kClientIp, ConnectionManagerConfig{0, client_limit}};
   connect(server, client, fake_network);
