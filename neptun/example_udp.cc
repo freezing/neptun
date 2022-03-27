@@ -12,6 +12,7 @@
 #include "neptun/messages/reliable_message.h"
 
 using namespace std;
+using namespace freezing;
 using namespace freezing::network;
 
 int main(int argc, char **argv) {
@@ -29,7 +30,7 @@ int main(int argc, char **argv) {
   std::uint64_t packet_id = 0;
   while (true) {
     // Write packet.
-    auto now = chrono::system_clock::now();
+    auto now = std::chrono::time_point_cast<milliseconds>(system_clock::now());
     auto timestamp = now.time_since_epoch().count();
     printf("Timestamp: %ld\n", timestamp);
     std::string note = "Hey there, I'm a UDP packet #: " + to_string(packet_id);

@@ -25,16 +25,16 @@ std::vector<u8> make_buffer(usize size = 1600) {
 namespace freezing::network {
 
 std::ostream &operator<<(std::ostream &os, const BandwidthLimit &bandwidth_limit) {
-  return os << "BandwidthLimit(rate=" << (int) bandwidth_limit.rate << ", max_packet_size="
-            << bandwidth_limit.max_packet_size << ")";
+  return os << "BandwidthLimit(rate=" << (int) bandwidth_limit.max_send_packet_rate << ", max_packet_size="
+            << bandwidth_limit.max_send_packet_size << ")";
 }
 
 }
 
 TEST(ConnectionManagerTest, Handshake) {
   auto buffer = make_buffer();
-  ConnectionManager server{kNumRedundantPackets, kServerBandwidthLimit};
-  ConnectionManager client{kNumRedundantPackets, kClientBandwidthLimit};
+  ConnectionManager server{ConnectionManagerConfig{kNumRedundantPackets, kServerBandwidthLimit}};
+  ConnectionManager client{ConnectionManagerConfig{kNumRedundantPackets, kClientBandwidthLimit}};
 
   client.connect();
   {
@@ -54,8 +54,8 @@ TEST(ConnectionManagerTest, Handshake) {
 
 TEST(ConnectionManagerTest, RedundantPackets) {
   auto buffer = make_buffer();
-  ConnectionManager server{kNumRedundantPackets, kServerBandwidthLimit};
-  ConnectionManager client{kNumRedundantPackets, kClientBandwidthLimit};
+  ConnectionManager server{ConnectionManagerConfig{kNumRedundantPackets, kServerBandwidthLimit}};
+  ConnectionManager client{ConnectionManagerConfig{kNumRedundantPackets, kClientBandwidthLimit}};
 
   client.connect();
   {
@@ -75,8 +75,8 @@ TEST(ConnectionManagerTest, RedundantPackets) {
 
 TEST(ConnectionManagerTest, ResendsDroppedLetsConnect) {
   auto buffer = make_buffer();
-  ConnectionManager server{kNumRedundantPackets, kServerBandwidthLimit};
-  ConnectionManager client{kNumRedundantPackets, kClientBandwidthLimit};
+  ConnectionManager server{ConnectionManagerConfig{kNumRedundantPackets, kServerBandwidthLimit}};
+  ConnectionManager client{ConnectionManagerConfig{kNumRedundantPackets, kClientBandwidthLimit}};
 
   client.connect();
 
@@ -90,8 +90,8 @@ TEST(ConnectionManagerTest, ResendsDroppedLetsConnect) {
 
 TEST(ConnectionManagerTest, DoesNothingIfNoPacketDeliveryStatus) {
   auto buffer = make_buffer();
-  ConnectionManager server{kNumRedundantPackets, kServerBandwidthLimit};
-  ConnectionManager client{0 /* num_redundant_packets */, kClientBandwidthLimit};
+  ConnectionManager server{ConnectionManagerConfig{kNumRedundantPackets, kServerBandwidthLimit}};
+  ConnectionManager client{ConnectionManagerConfig{0 /* num_redundant_packets */, kClientBandwidthLimit}};
 
   client.connect();
 

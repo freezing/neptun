@@ -19,9 +19,10 @@ namespace detail {
 
 static constexpr u32 kDefaultPacketTimeSeconds = 5;
 
+template<typename Clock>
 struct InFlightPacket {
   u32 id;
-  u64 time_dispatched;
+  time_point<Clock> time_dispatched;
 };
 
 static std::optional<u32> most_significant_bit(u32 value) {
@@ -64,12 +65,13 @@ private:
 
 };
 
+template<typename Clock>
 class PacketDeliveryManager {
 public:
   explicit PacketDeliveryManager(
       PacketId next_expected_packet_id,
       u32 packet_timeout_seconds = detail::kDefaultPacketTimeSeconds) : m_next_expected_packet_id{
-      next_expected_packet_id}, m_packet_timeout_seconds{
+      next_expected_packet_id}, m_packet_timeout{
       packet_timeout_seconds} {}
 
   // TODO: API should be clearer. I get confused by what is what.
@@ -82,12 +84,11 @@ public:
     return {processed_byte_count, statuses, header.id()};
   }
 
-  // TODO: Probably want better granularity for time, e.g. (ms) at least.
-  DeliveryStatuses drop_old_packets(u64 now) {
+  DeliveryStatuses drop_old_packets(time_point<Clock> now) {
     DeliveryStatuses statuses{};
     while (!m_in_flight_packets.empty()) {
       auto in_flight = m_in_flight_packets.front();
-      if (in_flight.time_dispatched + m_packet_timeout_seconds <= now) {
+      if (in_flight.time_dispatched + m_packet_timeout <= now) {
         statuses.add_drop(in_flight.id);
         m_in_flight_packets.pop();
       } else {
@@ -97,7 +98,7 @@ public:
     return statuses;
   }
 
-  usize write(byte_span buffer, u64 now) {
+  usize write(byte_span buffer, time_point<Clock> now) {
     auto packet_id = m_next_outgoing_packet_id++;
     m_in_flight_packets.push({packet_id, now});
     if (m_pending_acks.empty()) {
@@ -129,11 +130,11 @@ public:
   }
 
 private:
-  u64 m_packet_timeout_seconds;
+  milliseconds m_packet_timeout;
   u32 m_next_outgoing_packet_id{0};
   u32 m_next_expected_packet_id;
   std::queue<u32> m_pending_acks{};
-  std::queue<detail::InFlightPacket> m_in_flight_packets{};
+  std::queue<detail::InFlightPacket<Clock>> m_in_flight_packets{};
 
   DeliveryStatuses process_acks(u32 ack_sequence_number, u32 ack_bitmask) {
     // All 0 after the highest set bit are ignored because it's possible that the other host

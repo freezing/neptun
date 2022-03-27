@@ -6,6 +6,7 @@
 #include <gmock/gmock.h>
 
 #include "common/types.h"
+#include "common/fake_clock.h"
 #include "neptun/packet_delivery_manager.h"
 
 using namespace freezing;
@@ -15,8 +16,7 @@ using namespace testing;
 namespace {
 
 constexpr u32 kPacketId = 3;
-// 2022-03-15 21:18:41 GMT (not relevant, but doesn't hurt to know).
-constexpr u64 kNow = 1647379116;
+const FakeClock::time_point kNow = FakeClock::now();
 
 std::vector<u8> make_buffer(usize capacity = 1600) {
   return std::vector<u8>(capacity);
@@ -41,7 +41,7 @@ std::ostream &operator<<(std::ostream &stream, const PacketDeliveryStatus &statu
 TEST(PacketDeliveryManagerTest, SentPacketIdsAreContinuouslyIncreasing) {
   constexpr u32 kInitialExpectedPacketId = 10;
   auto buffer = make_buffer();
-  PacketDeliveryManager manager{kInitialExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId};
 
   for (u32 expected_packet_id = 0; expected_packet_id < 100; expected_packet_id++) {
     auto byte_count = manager.write(buffer, kNow);
@@ -54,7 +54,7 @@ TEST(PacketDeliveryManagerTest, SentPacketIdsAreContinuouslyIncreasing) {
 TEST(PacketDeliveryManagerTest, AcksAndDropsSentPackets) {
   // Irrelevant for the test.
   constexpr u32 kInitialExpectedPacketId = 10;
-  PacketDeliveryManager manager{kInitialExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId};
 
   // Send 30 packets.
   for (PacketId packet_id = 0; packet_id < 30; packet_id++) {
@@ -104,7 +104,7 @@ TEST(PacketDeliveryManagerTest, AcksAndDropsSentPackets) {
 TEST(PacketDeliveryManagerTest, BoundaryAck) {
   // Irrelevant for the test.
   constexpr PacketId kInitialExpectedPacketId = 10;
-  PacketDeliveryManager manager{kInitialExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId};
 
   // Send 34 packets.
   for (PacketId packet_id = 0; packet_id < 34; packet_id++) {
@@ -160,16 +160,16 @@ TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
   // Irrelevant for the test.
   constexpr PacketId kInitialExpectedPacketId = 10;
   constexpr u32 kPacketTimeoutSeconds = 5;
-  PacketDeliveryManager manager{kInitialExpectedPacketId, kPacketTimeoutSeconds};
+  PacketDeliveryManager<FakeClock> manager{kInitialExpectedPacketId, kPacketTimeoutSeconds};
 
   // Send 34 packets.
   for (PacketId packet_id = 0; packet_id < 34; packet_id++) {
     auto write_buffer = make_buffer();
-    manager.write(write_buffer, kNow + packet_id);
+    manager.write(write_buffer, kNow + seconds(packet_id));
   }
 
   // 10 seconds have passed, so packets at time[now + 0, now + 5] have expired.
-  constexpr u32 kNewNow = kNow + 10;
+  const auto kNewNow = kNow + seconds(10);
   auto delivery_statuses = manager.drop_old_packets(kNewNow);
 
   ASSERT_THAT(delivery_statuses.to_vector(), ElementsAre(
@@ -183,7 +183,7 @@ TEST(PacketDeliveryManagerTest, PacketsAreDroppedIfNotAckedForSomeTime) {
 
 TEST(PacketDeliveryManagerTest, ReadsExpectedPackets) {
   constexpr PacketId kExpectedPacketId = 10;
-  PacketDeliveryManager manager{kExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kExpectedPacketId};
 
   for (PacketId packet_id = 10; packet_id < 20; packet_id++) {
     auto buffer = make_buffer();
@@ -199,7 +199,7 @@ TEST(PacketDeliveryManagerTest, ReadsExpectedPackets) {
 
 TEST(PacketDeliveryManagerTest, ReadsPacketsAfterExpected) {
   constexpr PacketId kExpectedPacketId = 10;
-  PacketDeliveryManager manager{kExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kExpectedPacketId};
 
   auto buffer = make_buffer();
   constexpr PacketId packet_id = 15;
@@ -214,7 +214,7 @@ TEST(PacketDeliveryManagerTest, ReadsPacketsAfterExpected) {
 
 TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
   constexpr PacketId kExpectedPacketId = 10;
-  PacketDeliveryManager manager{kExpectedPacketId};
+  PacketDeliveryManager<FakeClock> manager{kExpectedPacketId};
 
   auto buffer = make_buffer();
   constexpr PacketId packet_id = 9;
@@ -229,8 +229,8 @@ TEST(PacketDeliveryManagerTest, IgnoresPacketsBeforeExpected) {
 
 TEST(PacketDeliveryManagerTest, WriteAndReadPacketWithAcks) {
   auto buffer = make_buffer();
-  PacketDeliveryManager server{0};
-  PacketDeliveryManager client{0};
+  PacketDeliveryManager<FakeClock> server{0};
+  PacketDeliveryManager<FakeClock> client{0};
 
   {
     auto write_count = server.write(buffer, kNow);

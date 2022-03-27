@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/ticker.h"
+#include "neptun/format.h"
 #include "network/udp_socket.h"
 #include "network/message.h"
 #include "neptun.h"
@@ -38,7 +39,8 @@ int main(int argc, char **argv) {
 
   auto ip = IpAddress::from_ipv4(argv[1], stoi(argv[2]));
   auto peer_ip = IpAddress::from_ipv4(argv[3], stoi(argv[4]));
-  Neptun<OsNetwork> neptun{OS_NETWORK, ip};
+  ConnectionManagerConfig config{5, BandwidthLimit{120, 1400}};
+  Neptun<OsNetwork, system_clock> neptun{OS_NETWORK, ip, config};
 
   Ticker reliable_ticker(chrono::system_clock::now(), chrono::milliseconds(0));
   Ticker unreliable_ticker(chrono::system_clock::now(), chrono::milliseconds(30));
@@ -52,7 +54,7 @@ int main(int argc, char **argv) {
   NetworkMetrics last_network_metrics{"Network Rate"};
   std::chrono::sys_time<std::chrono::nanoseconds> last_print_metrics_time{};
   while (true) {
-    auto now = chrono::system_clock::now();
+    auto now = time_point_cast<milliseconds>(chrono::system_clock::now());
 
     if (reliable_ticker.tick(now)) {
       for (usize i = 0; i < kNumReliableMsgsPerBatch; i++) {
@@ -130,7 +132,7 @@ int main(int argc, char **argv) {
       chars_read += s.size();
     };
 
-    neptun.tick(chrono::time_point_cast<chrono::seconds>(now).time_since_epoch().count(),
+    neptun.tick(now,
                 print_string,
                 print_string);
 

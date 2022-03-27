@@ -19,11 +19,22 @@
 namespace freezing::network {
 
 struct BandwidthLimit {
-  u8 rate;
-  // Maximum size of the packet in bytes.
-  u16 max_packet_size;
+  // Maximum rate of incoming packets.
+  u8 max_read_packet_rate;
+  // Maximum size of the incoming packet in bytes.
+  u16 max_read_packet_size;
+  // Maximum rate of outgoing packets.
+  u8 max_send_packet_rate;
+  // Maximum size of the outgoing packet in bytes.
+  u16 max_send_packet_size;
+
 
   bool operator <=>(const BandwidthLimit&) const = default;
+};
+
+struct ConnectionManagerConfig {
+  usize num_redundant_packets;
+  BandwidthLimit limit;
 };
 
 // Responsible for establishing and maintaining the connection.
@@ -87,20 +98,30 @@ struct BandwidthLimit {
 // state again.
 class ConnectionManager {
 public:
-  explicit ConnectionManager(usize num_redundant_packets, BandwidthLimit bandwidth_limit)
-      : m_num_redundant_packets{num_redundant_packets}, m_bandwidth_limit{bandwidth_limit} {}
+  explicit ConnectionManager(ConnectionManagerConfig config)
+      : m_config{config} {}
 
   // Next time write() function is called it will include LetsConnect message.
   void connect() {
-    m_num_lets_connect_to_send = m_num_redundant_packets + 1;
+    m_num_lets_connect_to_send = m_config.num_redundant_packets + 1;
     m_is_initiator = true;
+  }
+
+  bool is_handshake_successful() const {
+    return m_peer_bandwidth_limit.has_value();
   }
 
   void on_packet_status_delivery(PacketId packet_id, PacketDeliveryStatus status) {
     switch (status) {
     case PacketDeliveryStatus::ACK: {
       if (!m_in_flight_lets_connect.empty() && m_in_flight_lets_connect.front() == packet_id) {
+        // Clear the queue.
+        while (!m_in_flight_lets_connect.empty()) {
+          m_in_flight_lets_connect.pop();
+        }
         m_in_flight_lets_connect.pop();
+        // No need to send redundant packets anymore.
+        m_num_lets_connect_to_send = 0;
       }
       break;
     }
@@ -146,14 +167,10 @@ public:
         is_fail = false;
         if (!m_is_initiator) {
           // This is a request.
-          m_num_lets_connect_to_send = m_num_redundant_packets;
+          m_num_lets_connect_to_send = m_config.num_redundant_packets + 1;
           set_peer_bandwidth_limit(lets_connect);
         } else {
-          // This is a response. Ignore any future requests.
-          // Clear the queue.
-          while (!m_in_flight_lets_connect.empty()) {
-            m_in_flight_lets_connect.pop();
-          }
+          // This is a response.
           set_peer_bandwidth_limit(lets_connect);
         }
       } else {
@@ -183,8 +200,10 @@ public:
       } else {
         MessageHeader::write(advance(buffer, idx), LetsConnect::kId);
         LetsConnect::write(advance(buffer, idx + MessageHeader::kSerializedSize),
-                           m_bandwidth_limit.rate,
-                           m_bandwidth_limit.max_packet_size);
+                           m_config.limit.max_send_packet_rate,
+                           m_config.limit.max_read_packet_rate,
+                           m_config.limit.max_send_packet_size,
+                           m_config.limit.max_read_packet_size);
         idx += MessageHeader::kSerializedSize + LetsConnect::kSerializedSize;
       }
       m_in_flight_lets_connect.push(packet_id);
@@ -201,8 +220,7 @@ public:
   }
 
 private:
-  usize m_num_redundant_packets;
-  BandwidthLimit m_bandwidth_limit;
+  ConnectionManagerConfig m_config;
   std::queue<PacketId> m_in_flight_lets_connect{};
   usize m_num_lets_connect_to_send{0};
   bool is_fail{false};
@@ -216,7 +234,12 @@ private:
 
   void set_peer_bandwidth_limit(LetsConnect lets_connect) {
     m_peer_bandwidth_limit =
-        BandwidthLimit{lets_connect.packet_rate(), lets_connect.max_packet_length()};
+        BandwidthLimit{
+      .max_send_packet_rate = lets_connect.max_send_packet_rate(),
+      .max_read_packet_rate = lets_connect.max_read_packet_rate(),
+      .max_send_packet_size = lets_connect.max_send_packet_size(),
+      .max_read_packet_size = lets_connect.max_read_packet_size()
+      };
   }
 };
 

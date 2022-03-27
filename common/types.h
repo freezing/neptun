@@ -5,6 +5,7 @@
 #ifndef NEPTUN_COMMON_COMMON_H
 #define NEPTUN_COMMON_COMMON_H
 
+#include <chrono>
 #include <cinttypes>
 #include <span>
 #include <tl/expected.hpp>
@@ -21,7 +22,19 @@ using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using usize = std::size_t;
 using byte_span = std::span<u8>;
+// TODO: This should be [const u8], but I have to split [IoBuffer] first.
+using const_byte_span = std::span<u8>;
 // TODO: Introduce [time_ns] to avoid precision bugs.
+
+using seconds = std::chrono::seconds;
+using milliseconds = std::chrono::milliseconds;
+using microseconds = std::chrono::microseconds;
+using nanoseconds = std::chrono::nanoseconds;
+
+template<typename Clock>
+using time_point = std::chrono::time_point<Clock, nanoseconds>;
+
+using system_clock = std::chrono::system_clock;
 
 inline byte_span advance(byte_span span, usize count) {
   return span.last(span.size() - count);

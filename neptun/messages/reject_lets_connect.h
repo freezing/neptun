@@ -19,6 +19,8 @@ public:
   static byte_span write(byte_span buffer) {
     return buffer.first(0);
   }
+
+  RejectLetsConnect(byte_span buffer) {}
 };
 
 }

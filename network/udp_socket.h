@@ -24,12 +24,12 @@ public:
     return socket;
   }
 
-  [[nodiscard]] std::optional<ReadPacketInfo> read(std::span<std::uint8_t> buffer) {
+  [[nodiscard]] std::optional<ReadPacketInfo> read(byte_span buffer) {
     return m_network.read_from_socket(m_fd, buffer);
   }
 
   [[nodiscard]] std::size_t send_to(IpAddress ip_address,
-                                    std::span<const std::uint8_t> payload) const {
+                                    const_byte_span payload) const {
     return m_network.send_to(m_fd, ip_address, payload);
   }
 

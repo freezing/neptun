@@ -28,7 +28,7 @@ public:
     return buffer.first(count);
   }
 
-  explicit PacketHeader(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
+  explicit PacketHeader(byte_span buffer) : m_buffer{buffer} {}
 
   PacketId id() const {
     return m_buffer.read_u32(kIdOffset);

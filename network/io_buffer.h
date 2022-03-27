@@ -22,6 +22,7 @@ namespace freezing::network {
 // The current implementation assumes that the buffer encoding is in network-endian (big-endian).
 // At the moment, the smallest granularity at which IoBuffer works is one byte,
 // but it should be extended to support granularity at one bit.
+// TODO: Split into reader and writer that take const_byte_span and byte_span respectively.
 class IoBuffer {
 public:
   IoBuffer(std::span<std::uint8_t> buffer) : m_buffer{buffer} {}
